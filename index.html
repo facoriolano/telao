@@ -1,54 +1,53 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Modo Diretor</title>
   <style>
     body {
-      background-color: #1c1c1c;
+      font-family: Arial, sans-serif;
+      background-color: #1e1e1e;
       color: white;
-      font-family: sans-serif;
       padding: 20px;
     }
-    h1, h2 {
-      text-align: center;
+    #trechoAtualContainer {
+      margin-bottom: 20px;
     }
     #trechoAtual {
-      background-color: #333;
+      background: #333;
       padding: 20px;
-      font-size: 24px;
       border-radius: 10px;
-      margin: 20px auto;
-      max-width: 800px;
+      font-size: 1.5em;
       text-align: center;
-    }
-    .botoes {
-      text-align: center;
-      margin: 10px;
     }
     .botoes button {
       padding: 10px 20px;
-      margin: 5px;
+      margin: 10px;
+      font-size: 16px;
     }
     #proximosContainer {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 10px;
       margin-top: 20px;
     }
+    .linha-preview {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 10px 0;
+    }
     .preview {
-      background-color: #333;
-      color: #ccc;
+      background: #555;
       padding: 10px;
-      border-radius: 10px;
-      max-width: 200px;
-      cursor: pointer;
+      border-radius: 8px;
+      min-width: 200px;
       text-align: center;
+      white-space: pre-wrap;
+      color: #ddd;
     }
     .preview.atual {
-      background-color: orange;
+      background: orange;
       color: black;
+      font-weight: bold;
     }
     input[type="file"] {
       margin-bottom: 10px;
@@ -57,33 +56,90 @@
 </head>
 <body>
   <h1>Modo Diretor</h1>
-  <input type="file" id="fileInput" accept=".txt">
+
+  <input type="file" id="fileInput" />
   <button onclick="abrirTelao()">Abrir Telão</button>
 
   <section id="trechoAtualContainer">
     <h2>Trecho Atual</h2>
     <div id="trechoAtual">Carregue um arquivo .txt</div>
     <div class="botoes">
-      <button id="voltarBtn">⬅️ Voltar</button>
-      <button id="avancarBtn">➡️ Avançar</button>
+      <button id="voltarBtn">⬅ Voltar</button>
+      <button id="avancarBtn">Avançar ➡</button>
     </div>
   </section>
 
   <section id="proximosContainer">
     <h2>Contexto (Anteriores e Próximos)</h2>
-    <div id="miniaturas"></div>
+    <div class="linha-preview" id="linhaPreviews"></div>
   </section>
 
   <script>
-    let trechos = [];
     let indexAtual = 0;
-    let telao;
-    let recognition;
+    let telao = null;
+    let reconhecimento = null;
+    let trechos = [];
 
-    document.getElementById('fileInput').addEventListener('change', function(e) {
+    function atualizarTela() {
+      const atual = trechos[indexAtual] || "";
+      document.getElementById("trechoAtual").innerText = atual;
+      if (telao && !telao.closed) {
+        telao.postMessage({ tipo: "atualizar", conteudo: atual }, "*");
+      }
+      atualizarPreviews();
+    }
+
+    function atualizarPreviews() {
+      const container = document.getElementById("linhaPreviews");
+      container.innerHTML = "";
+      const inicio = Math.max(0, indexAtual - 5);
+      const fim = Math.min(trechos.length, indexAtual + 6);
+
+      for (let i = inicio; i < fim; i++) {
+        const div = document.createElement("div");
+        div.className = "preview";
+        if (i === indexAtual) div.classList.add("atual");
+        div.innerText = trechos[i];
+        container.appendChild(div);
+      }
+    }
+
+    function avancar() {
+      if (indexAtual < trechos.length - 1) {
+        indexAtual++;
+        atualizarTela();
+      }
+    }
+
+    function voltar() {
+      if (indexAtual > 0) {
+        indexAtual--;
+        atualizarTela();
+      }
+    }
+
+    function iniciarReconhecimentoVoz() {
+      if (!('webkitSpeechRecognition' in window)) return;
+      reconhecimento = new webkitSpeechRecognition();
+      reconhecimento.lang = 'pt-BR';
+      reconhecimento.continuous = true;
+      reconhecimento.interimResults = false;
+
+      reconhecimento.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript.trim();
+        const atual = trechos[indexAtual] || "";
+        if (transcript && atual.includes(transcript)) {
+          setTimeout(avancar, 100); // avançar em 0.1s
+        }
+      };
+
+      reconhecimento.start();
+    }
+
+    document.getElementById("fileInput").addEventListener("change", function (e) {
       const reader = new FileReader();
-      reader.onload = function(event) {
-        const linhas = event.target.result.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      reader.onload = function () {
+        const linhas = reader.result.split(/\n+/).filter(Boolean);
         trechos = [];
         for (let i = 0; i < linhas.length; i += 3) {
           trechos.push(linhas.slice(i, i + 3).join("\n"));
@@ -95,83 +151,18 @@
       reader.readAsText(e.target.files[0]);
     });
 
+    document.getElementById("voltarBtn").onclick = voltar;
+    document.getElementById("avancarBtn").onclick = avancar;
+
     function abrirTelao() {
-      telao = window.open("telao.html", "Telão", "width=800,height=600");
+      telao = window.open("telao.html", "telao", "width=800,height=600");
     }
 
-    function atualizarTela() {
-      document.getElementById("trechoAtual").innerText = trechos[indexAtual] || "";
-      if (telao && !telao.closed) {
-        telao.postMessage({ texto: trechos[indexAtual] }, "*");
-      }
-      atualizarMiniaturas();
-    }
-
-    function atualizarMiniaturas() {
-      const container = document.getElementById("miniaturas");
-      container.innerHTML = "";
-      const inicio = Math.max(0, indexAtual - 5);
-      const fim = Math.min(trechos.length, indexAtual + 6);
-      for (let i = inicio; i < fim; i++) {
-        const div = document.createElement("div");
-        div.className = "preview" + (i === indexAtual ? " atual" : "");
-        div.innerText = trechos[i];
-        div.onclick = () => {
-          indexAtual = i;
-          atualizarTela();
-        };
-        container.appendChild(div);
-      }
-    }
-
-    document.getElementById("voltarBtn").onclick = () => {
-      if (indexAtual > 0) {
-        indexAtual--;
-        atualizarTela();
-      }
-    };
-
-    document.getElementById("avancarBtn").onclick = () => {
-      if (indexAtual < trechos.length - 1) {
-        indexAtual++;
-        atualizarTela();
-      }
-    };
-
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowRight") document.getElementById("avancarBtn").click();
-      if (e.key === "ArrowLeft") document.getElementById("voltarBtn").click();
-      if (e.key.toLowerCase() === "f") {
-        if (telao && !telao.closed) telao.document.documentElement.requestFullscreen();
-      }
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") avancar();
+      if (e.key === "ArrowLeft") voltar();
+      if (e.key === "f") abrirTelao();
     });
-
-    function iniciarReconhecimentoVoz() {
-      if (!('webkitSpeechRecognition' in window)) return;
-      recognition = new webkitSpeechRecognition();
-      recognition.lang = 'pt-BR';
-      recognition.continuous = true;
-      recognition.interimResults = true;
-
-      recognition.onresult = (event) => {
-        const transcript = Array.from(event.results)
-          .map(r => r[0].transcript)
-          .join(' ')
-          .toLowerCase();
-
-        const trechoAtual = trechos[indexAtual]?.toLowerCase().replace(/\n/g, ' ');
-        if (trechoAtual && transcript.includes(trechoAtual.substring(0, trechoAtual.length - 10))) {
-          setTimeout(() => {
-            if (indexAtual < trechos.length - 1) {
-              indexAtual++;
-              atualizarTela();
-            }
-          }, 100);
-        }
-      };
-      recognition.onerror = (e) => console.error(e);
-      recognition.start();
-    }
   </script>
 </body>
 </html>
