@@ -2,13 +2,30 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Telão Sincronizado</title>
+  <title>Modo Diretor - Telão Interativo</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="display-container">
-    <input type="file" id="fileInput" accept=".txt" />
-    <p id="trecho">Escolha um arquivo .txt para começar...</p>
+  <div id="painel">
+    <header>
+      <h1>Modo Diretor</h1>
+      <input type="file" id="fileInput" accept=".txt" />
+      <button id="abrirPopUp" disabled>Abrir Telão</button>
+    </header>
+
+    <section id="trechoAtualContainer">
+      <h2>Trecho Atual</h2>
+      <div id="trechoAtual">Carregue o arquivo .txt</div>
+      <div class="botoes">
+        <button id="voltarBtn">⬅️ Voltar</button>
+        <button id="avancarBtn">➡️ Avançar</button>
+      </div>
+    </section>
+
+    <section id="proximosContainer">
+      <h2>Próximos Trechos</h2>
+      <div id="miniaturas"></div>
+    </section>
   </div>
 
   <script src="script.js"></script>
