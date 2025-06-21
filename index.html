@@ -4,6 +4,29 @@
   <meta charset="UTF-8" />
   <title>Modo Diretor - Telão Interativo</title>
   <link rel="stylesheet" href="style.css" />
+  <style>
+    .miniatura {
+      border: 1px solid #ccc;
+      padding: 6px;
+      margin: 4px;
+      cursor: pointer;
+      border-radius: 6px;
+      background: #f4f4f4;
+    }
+    .miniatura:hover {
+      background-color: #e0e0e0;
+    }
+    .miniatura.atual {
+      background-color: orange;
+      font-weight: bold;
+      color: white;
+    }
+    #miniaturas {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+  </style>
 </head>
 <body>
   <div id="painel">
@@ -23,7 +46,7 @@
     </section>
 
     <section id="proximosContainer">
-      <h2>Próximos Trechos</h2>
+      <h2>Contexto (Anteriores e Próximos)</h2>
       <div id="miniaturas"></div>
     </section>
   </div>
@@ -84,9 +107,11 @@
 
     function atualizarMiniaturas() {
       miniaturas.innerHTML = "";
-      for (let i = currentIndex + 1; i <= currentIndex + 10 && i < trechos.length; i++) {
+      for (let i = currentIndex - 5; i <= currentIndex + 5; i++) {
+        if (i < 0 || i >= trechos.length) continue;
         const div = document.createElement("div");
         div.className = "miniatura";
+        if (i === currentIndex) div.classList.add("atual");
         div.innerText = trechos[i];
         div.onclick = () => {
           currentIndex = i;
@@ -138,7 +163,6 @@
         const falado = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
         console.log("Falado:", falado);
 
-        // Match por similaridade com base no início da linha
         let encontrado = -1;
         for (let i = Math.max(0, currentIndex - 3); i <= Math.min(trechos.length - 1, currentIndex + 3); i++) {
           if (falado.includes(trechos[i].toLowerCase().slice(0, 10))) {
@@ -152,8 +176,8 @@
           atualizarTela();
         }
 
-        // Avançar automaticamente 1s depois se falou toda a frase
-        if (falado === trechos[currentIndex]?.toLowerCase()) {
+        const trechoAtualTexto = trechos[currentIndex]?.toLowerCase();
+        if (trechoAtualTexto && falado.includes(trechoAtualTexto.slice(0, Math.floor(trechoAtualTexto.length * 0.8)))) {
           setTimeout(() => {
             avancar();
           }, 1000);
