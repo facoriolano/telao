@@ -152,9 +152,11 @@
           atualizarTela();
         }
 
-        // Avançar automaticamente se falou toda a frase
+        // Avançar automaticamente 1s depois se falou toda a frase
         if (falado === trechos[currentIndex]?.toLowerCase()) {
-          avancar();
+          setTimeout(() => {
+            avancar();
+          }, 1000);
         }
       };
 
