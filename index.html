@@ -1,98 +1,176 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Modo Diretor</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; background: #111; color: white; }
-    #slides { max-width: 900px; margin: 20px auto; display: flex; flex-wrap: wrap; gap: 10px; }
-    .preview {
-      flex: 1 1 calc(20% - 10px);
-      background: #222;
-      padding: 10px;
-      border-radius: 6px;
-      text-align: center;
-      white-space: pre-wrap;
-      color: #ccc;
-      min-height: 100px;
+    body {
+      background-color: #1c1c1c;
+      color: white;
+      font-family: sans-serif;
+      padding: 20px;
     }
-    .preview.atual { background: orange; color: black; font-weight: bold; }
-    #atualSlide { font-size: 24px; background: #333; padding: 20px; border-radius: 10px; margin-bottom: 20px; white-space: pre-wrap; }
-    button { padding: 10px 20px; margin: 5px; font-size: 16px; }
+    h1, h2 {
+      text-align: center;
+    }
+    #trechoAtual {
+      background-color: #333;
+      padding: 20px;
+      font-size: 24px;
+      border-radius: 10px;
+      margin: 20px auto;
+      max-width: 800px;
+      text-align: center;
+    }
+    .botoes {
+      text-align: center;
+      margin: 10px;
+    }
+    .botoes button {
+      padding: 10px 20px;
+      margin: 5px;
+    }
+    #proximosContainer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .preview {
+      background-color: #333;
+      color: #ccc;
+      padding: 10px;
+      border-radius: 10px;
+      max-width: 200px;
+      cursor: pointer;
+      text-align: center;
+    }
+    .preview.atual {
+      background-color: orange;
+      color: black;
+    }
+    input[type="file"] {
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 <body>
   <h1>Modo Diretor</h1>
   <input type="file" id="fileInput" accept=".txt">
   <button onclick="abrirTelao()">Abrir Telão</button>
-  <div id="atualSlide">Carregue um arquivo .txt</div>
-  <button onclick="voltar()">Voltar</button>
-  <button onclick="avancar()">Avançar</button>
-  <h2>Contexto (Anteriores e Próximos)</h2>
-  <div id="slides"></div>
+
+  <section id="trechoAtualContainer">
+    <h2>Trecho Atual</h2>
+    <div id="trechoAtual">Carregue um arquivo .txt</div>
+    <div class="botoes">
+      <button id="voltarBtn">⬅️ Voltar</button>
+      <button id="avancarBtn">➡️ Avançar</button>
+    </div>
+  </section>
+
+  <section id="proximosContainer">
+    <h2>Contexto (Anteriores e Próximos)</h2>
+    <div id="miniaturas"></div>
+  </section>
 
   <script>
-    let slides = [];
-    let current = 0;
-    let telao = null;
+    let trechos = [];
+    let indexAtual = 0;
+    let telao;
+    let recognition;
 
-    document.getElementById('fileInput').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const lines = e.target.result.split(/\r?\n/).map(l => l.trim()).filter(l => l);
-          slides = [];
-          for (let i = 0; i < lines.length; i += 3) {
-            slides.push(lines.slice(i, i + 3).join('\n'));
-          }
-          current = 0;
-          render();
-          enviarParaTelao();
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const linhas = event.target.result.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        trechos = [];
+        for (let i = 0; i < linhas.length; i += 3) {
+          trechos.push(linhas.slice(i, i + 3).join("\n"));
         }
-        reader.readAsText(file);
+        indexAtual = 0;
+        atualizarTela();
+        iniciarReconhecimentoVoz();
+      };
+      reader.readAsText(e.target.files[0]);
+    });
+
+    function abrirTelao() {
+      telao = window.open("telao.html", "Telão", "width=800,height=600");
+    }
+
+    function atualizarTela() {
+      document.getElementById("trechoAtual").innerText = trechos[indexAtual] || "";
+      if (telao && !telao.closed) {
+        telao.postMessage({ texto: trechos[indexAtual] }, "*");
+      }
+      atualizarMiniaturas();
+    }
+
+    function atualizarMiniaturas() {
+      const container = document.getElementById("miniaturas");
+      container.innerHTML = "";
+      const inicio = Math.max(0, indexAtual - 5);
+      const fim = Math.min(trechos.length, indexAtual + 6);
+      for (let i = inicio; i < fim; i++) {
+        const div = document.createElement("div");
+        div.className = "preview" + (i === indexAtual ? " atual" : "");
+        div.innerText = trechos[i];
+        div.onclick = () => {
+          indexAtual = i;
+          atualizarTela();
+        };
+        container.appendChild(div);
+      }
+    }
+
+    document.getElementById("voltarBtn").onclick = () => {
+      if (indexAtual > 0) {
+        indexAtual--;
+        atualizarTela();
+      }
+    };
+
+    document.getElementById("avancarBtn").onclick = () => {
+      if (indexAtual < trechos.length - 1) {
+        indexAtual++;
+        atualizarTela();
+      }
+    };
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") document.getElementById("avancarBtn").click();
+      if (e.key === "ArrowLeft") document.getElementById("voltarBtn").click();
+      if (e.key.toLowerCase() === "f") {
+        if (telao && !telao.closed) telao.document.documentElement.requestFullscreen();
       }
     });
 
-    function render() {
-      document.getElementById('atualSlide').innerText = slides[current] || '';
-      const container = document.getElementById('slides');
-      container.innerHTML = '';
-      for (let i = current - 5; i <= current + 5; i++) {
-        if (i >= 0 && i < slides.length) {
-          const div = document.createElement('div');
-          div.className = 'preview' + (i === current ? ' atual' : '');
-          div.innerText = slides[i];
-          div.onclick = () => { current = i; render(); enviarParaTelao(); };
-          container.appendChild(div);
+    function iniciarReconhecimentoVoz() {
+      if (!('webkitSpeechRecognition' in window)) return;
+      recognition = new webkitSpeechRecognition();
+      recognition.lang = 'pt-BR';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(r => r[0].transcript)
+          .join(' ')
+          .toLowerCase();
+
+        const trechoAtual = trechos[indexAtual]?.toLowerCase().replace(/\n/g, ' ');
+        if (trechoAtual && transcript.includes(trechoAtual.substring(0, trechoAtual.length - 10))) {
+          setTimeout(() => {
+            if (indexAtual < trechos.length - 1) {
+              indexAtual++;
+              atualizarTela();
+            }
+          }, 100);
         }
-      }
-    }
-
-    function avancar() {
-      if (current < slides.length - 1) {
-        current++;
-        render();
-        enviarParaTelao();
-      }
-    }
-
-    function voltar() {
-      if (current > 0) {
-        current--;
-        render();
-        enviarParaTelao();
-      }
-    }
-
-    function abrirTelao() {
-      telao = window.open('telao.html', 'Telao', 'width=800,height=600');
-    }
-
-    function enviarParaTelao() {
-      if (telao && !telao.closed) {
-        telao.postMessage(slides[current] || '', '*');
-      }
+      };
+      recognition.onerror = (e) => console.error(e);
+      recognition.start();
     }
   </script>
 </body>
