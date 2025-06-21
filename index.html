@@ -5,16 +5,22 @@
   <title>Modo Diretor - Telão Interativo</title>
   <link rel="stylesheet" href="style.css" />
   <style>
+    body {
+      background-color: #1c1c1c;
+      color: white;
+      font-family: sans-serif;
+    }
     .miniatura {
-      border: 1px solid #ccc;
+      border: 1px solid #555;
       padding: 6px;
       margin: 4px;
       cursor: pointer;
       border-radius: 6px;
-      background: #f4f4f4;
+      background: #2a2a2a;
+      color: #f1f1f1;
     }
     .miniatura:hover {
-      background-color: #e0e0e0;
+      background-color: #444;
     }
     .miniatura.atual {
       background-color: orange;
@@ -25,6 +31,17 @@
       display: flex;
       flex-wrap: wrap;
       gap: 4px;
+    }
+    .botoes button {
+      margin: 0 4px;
+      padding: 8px 12px;
+    }
+    #trechoAtual {
+      font-size: 1.4em;
+      background: #333;
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 10px;
     }
   </style>
 </head>
@@ -90,7 +107,7 @@
       popupWindow.document.body.innerHTML = "<p id='texto'></p>";
 
       atualizarTelao();
-    };
+    }
 
     function atualizarTela() {
       trechoAtual.innerText = trechos[currentIndex] || "";
@@ -180,7 +197,7 @@
         if (trechoAtualTexto && falado.includes(trechoAtualTexto.slice(0, Math.floor(trechoAtualTexto.length * 0.8)))) {
           setTimeout(() => {
             avancar();
-          }, 1000);
+          }, 100); // Ajustado para 0.1 segundo (100ms)
         }
       };
 
