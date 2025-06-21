@@ -2,210 +2,97 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Modo Diretor - Telão Interativo</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>Modo Diretor</title>
   <style>
-    body {
-      background-color: #1c1c1c;
-      color: white;
-      font-family: sans-serif;
-    }
-    .miniatura {
-      border: 1px solid #555;
-      padding: 6px;
-      margin: 4px;
-      cursor: pointer;
-      border-radius: 6px;
-      background: #2a2a2a;
-      color: #f1f1f1;
-    }
-    .miniatura:hover {
-      background-color: #444;
-    }
-    .miniatura.atual {
-      background-color: orange;
-      font-weight: bold;
-      color: white;
-    }
-    #miniaturas {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-    }
-    .botoes button {
-      margin: 0 4px;
-      padding: 8px 12px;
-    }
-    #trechoAtual {
-      font-size: 1.4em;
-      background: #333;
+    body { font-family: sans-serif; padding: 20px; background: #111; color: white; }
+    #slides { max-width: 900px; margin: 20px auto; display: flex; flex-wrap: wrap; gap: 10px; }
+    .preview {
+      flex: 1 1 calc(20% - 10px);
+      background: #222;
       padding: 10px;
       border-radius: 6px;
-      margin-bottom: 10px;
+      text-align: center;
+      white-space: pre-wrap;
+      color: #ccc;
+      min-height: 100px;
     }
+    .preview.atual { background: orange; color: black; font-weight: bold; }
+    #atualSlide { font-size: 24px; background: #333; padding: 20px; border-radius: 10px; margin-bottom: 20px; white-space: pre-wrap; }
+    button { padding: 10px 20px; margin: 5px; font-size: 16px; }
   </style>
 </head>
 <body>
-  <div id="painel">
-    <header>
-      <h1>Modo Diretor</h1>
-      <input type="file" id="fileInput" accept=".txt" />
-      <button id="abrirPopUp" disabled>Abrir Telão</button>
-    </header>
-
-    <section id="trechoAtualContainer">
-      <h2>Trecho Atual</h2>
-      <div id="trechoAtual">Carregue o arquivo .txt</div>
-      <div class="botoes">
-        <button id="voltarBtn">⬅️ Voltar</button>
-        <button id="avancarBtn">➡️ Avançar</button>
-      </div>
-    </section>
-
-    <section id="proximosContainer">
-      <h2>Contexto (Anteriores e Próximos)</h2>
-      <div id="miniaturas"></div>
-    </section>
-  </div>
+  <h1>Modo Diretor</h1>
+  <input type="file" id="fileInput" accept=".txt">
+  <button onclick="abrirTelao()">Abrir Telão</button>
+  <div id="atualSlide">Carregue um arquivo .txt</div>
+  <button onclick="voltar()">Voltar</button>
+  <button onclick="avancar()">Avançar</button>
+  <h2>Contexto (Anteriores e Próximos)</h2>
+  <div id="slides"></div>
 
   <script>
-    let trechos = [];
-    let currentIndex = 0;
-    let popupWindow = null;
+    let slides = [];
+    let current = 0;
+    let telao = null;
 
-    const fileInput = document.getElementById("fileInput");
-    const abrirPopUpBtn = document.getElementById("abrirPopUp");
-    const trechoAtual = document.getElementById("trechoAtual");
-    const miniaturas = document.getElementById("miniaturas");
-    const avancarBtn = document.getElementById("avancarBtn");
-    const voltarBtn = document.getElementById("voltarBtn");
-
-    fileInput.addEventListener("change", function (event) {
-      const file = event.target.files[0];
-      const reader = new FileReader();
-
-      reader.onload = function (e) {
-        const texto = e.target.result;
-        trechos = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-        abrirPopUpBtn.disabled = false;
-        atualizarTela();
-        startReconhecimento();
-      };
-
-      reader.readAsText(file);
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const lines = e.target.result.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+          slides = [];
+          for (let i = 0; i < lines.length; i += 3) {
+            slides.push(lines.slice(i, i + 3).join('\n'));
+          }
+          current = 0;
+          render();
+          enviarParaTelao();
+        }
+        reader.readAsText(file);
+      }
     });
 
-    abrirPopUpBtn.onclick = () => {
-      popupWindow = window.open("", "Telão", "width=800,height=600");
-      popupWindow.document.body.style.background = "black";
-      popupWindow.document.body.style.color = "white";
-      popupWindow.document.body.style.fontSize = "3em";
-      popupWindow.document.body.style.display = "flex";
-      popupWindow.document.body.style.justifyContent = "center";
-      popupWindow.document.body.style.alignItems = "center";
-      popupWindow.document.body.style.textAlign = "center";
-      popupWindow.document.body.innerHTML = "<p id='texto'></p>";
-
-      atualizarTelao();
-    }
-
-    function atualizarTela() {
-      trechoAtual.innerText = trechos[currentIndex] || "";
-      atualizarTelao();
-      atualizarMiniaturas();
-    }
-
-    function atualizarTelao() {
-      if (popupWindow && !popupWindow.closed) {
-        const p = popupWindow.document.getElementById("texto");
-        p.innerText = trechos[currentIndex] || "";
-      }
-    }
-
-    function atualizarMiniaturas() {
-      miniaturas.innerHTML = "";
-      for (let i = currentIndex - 5; i <= currentIndex + 5; i++) {
-        if (i < 0 || i >= trechos.length) continue;
-        const div = document.createElement("div");
-        div.className = "miniatura";
-        if (i === currentIndex) div.classList.add("atual");
-        div.innerText = trechos[i];
-        div.onclick = () => {
-          currentIndex = i;
-          atualizarTela();
-        };
-        miniaturas.appendChild(div);
+    function render() {
+      document.getElementById('atualSlide').innerText = slides[current] || '';
+      const container = document.getElementById('slides');
+      container.innerHTML = '';
+      for (let i = current - 5; i <= current + 5; i++) {
+        if (i >= 0 && i < slides.length) {
+          const div = document.createElement('div');
+          div.className = 'preview' + (i === current ? ' atual' : '');
+          div.innerText = slides[i];
+          div.onclick = () => { current = i; render(); enviarParaTelao(); };
+          container.appendChild(div);
+        }
       }
     }
 
     function avancar() {
-      if (currentIndex < trechos.length - 1) {
-        currentIndex++;
-        atualizarTela();
+      if (current < slides.length - 1) {
+        current++;
+        render();
+        enviarParaTelao();
       }
     }
 
     function voltar() {
-      if (currentIndex > 0) {
-        currentIndex--;
-        atualizarTela();
+      if (current > 0) {
+        current--;
+        render();
+        enviarParaTelao();
       }
     }
 
-    avancarBtn.onclick = avancar;
-    voltarBtn.onclick = voltar;
+    function abrirTelao() {
+      telao = window.open('telao.html', 'Telao', 'width=800,height=600');
+    }
 
-    document.addEventListener("keydown", (e) => {
-      const tecla = e.key.toLowerCase();
-      if (tecla === "arrowright" || tecla === "d") avancar();
-      if (tecla === "arrowleft" || tecla === "a") voltar();
-      if (tecla === "f" && popupWindow && !popupWindow.closed) {
-        popupWindow.document.documentElement.requestFullscreen();
+    function enviarParaTelao() {
+      if (telao && !telao.closed) {
+        telao.postMessage(slides[current] || '', '*');
       }
-    });
-
-    function startReconhecimento() {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        alert("Reconhecimento de voz não suportado.");
-        return;
-      }
-
-      const recognition = new SpeechRecognition();
-      recognition.lang = "pt-BR";
-      recognition.continuous = true;
-      recognition.interimResults = false;
-
-      recognition.onresult = function (event) {
-        const falado = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
-        console.log("Falado:", falado);
-
-        let encontrado = -1;
-        for (let i = Math.max(0, currentIndex - 3); i <= Math.min(trechos.length - 1, currentIndex + 3); i++) {
-          if (falado.includes(trechos[i].toLowerCase().slice(0, 10))) {
-            encontrado = i;
-            break;
-          }
-        }
-
-        if (encontrado >= 0 && encontrado !== currentIndex) {
-          currentIndex = encontrado;
-          atualizarTela();
-        }
-
-        const trechoAtualTexto = trechos[currentIndex]?.toLowerCase();
-        if (trechoAtualTexto && falado.includes(trechoAtualTexto.slice(0, Math.floor(trechoAtualTexto.length * 0.8)))) {
-          setTimeout(() => {
-            avancar();
-          }, 100); // Ajustado para 0.1 segundo (100ms)
-        }
-      };
-
-      recognition.onerror = function (event) {
-        console.error("Erro no reconhecimento:", event.error);
-      };
-
-      recognition.start();
     }
   </script>
 </body>
