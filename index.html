@@ -33,7 +33,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 4px;
-      /* Removida altura e overflow para mostrar todos os slides */
+      /* Mostrar todos os slides sem barra de rolagem */
     }
     .botoes button {
       margin: 0 4px;
@@ -47,6 +47,8 @@
       margin-bottom: 10px;
       white-space: normal;
       word-break: break-word;
+      min-height: 7.5em; /* espaço para 5 linhas aproximadamente */
+      line-height: 1.5em;
     }
   </style>
 </head>
@@ -59,7 +61,7 @@
     </header>
 
     <section id="trechoAtualContainer">
-      <h2>Trecho Atual</h2>
+      <h2>Trecho Atual (5 linhas por slide)</h2>
       <div id="trechoAtual">Carregue o arquivo .txt</div>
       <div class="botoes">
         <button id="voltarBtn">⬅️ Voltar</button>
@@ -68,16 +70,17 @@
     </section>
 
     <section id="proximosContainer">
-      <h2>Contexto (Todos os Trechos)</h2>
+      <h2>Contexto (Todos os Slides)</h2>
       <div id="miniaturas"></div>
     </section>
   </div>
 
   <script>
     let trechos = [];
-    let currentIndex = 0;
+    let currentGroupIndex = 0;
+    const groupSize = 5; // 5 trechos por slide
     let popupWindow = null;
-    let avancadoPorVoz = false; // controle para evitar avanços múltiplos seguidos
+    let avancadoPorVoz = false; // controle para evitar múltiplos avanços seguidos
 
     const fileInput = document.getElementById("fileInput");
     const abrirPopUpBtn = document.getElementById("abrirPopUp");
@@ -94,6 +97,8 @@
         const texto = e.target.result;
         trechos = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
         abrirPopUpBtn.disabled = false;
+        currentGroupIndex = 0;
+        avancadoPorVoz = false;
         atualizarTela();
         startReconhecimento();
       };
@@ -122,14 +127,15 @@
             overflow-wrap: break-word;
             height: 100vh;
             box-sizing: border-box;
-            line-height: 1.6em; /* aumenta espaçamento para melhor leitura de 5 linhas */
+            line-height: 1.5em; /* espaçamento para 5 linhas */
           }
           #texto {
             max-width: 90vw;
-            max-height: 130vh; /* altura maior para caber 5 linhas */
+            max-height: 90vh;
             overflow-wrap: break-word;
             word-break: break-word;
             white-space: normal;
+            white-space: pre-line; /* respeitar quebras de linha */
           }
         </style>
       `;
@@ -137,8 +143,14 @@
       atualizarTelao();
     };
 
+    function getCurrentGroup() {
+      const start = currentGroupIndex * groupSize;
+      return trechos.slice(start, start + groupSize);
+    }
+
     function atualizarTela() {
-      trechoAtual.innerText = trechos[currentIndex] || "";
+      const grupo = getCurrentGroup();
+      trechoAtual.innerText = grupo.join('\n') || "";
       atualizarTelao();
       atualizarMiniaturas();
     }
@@ -146,20 +158,24 @@
     function atualizarTelao() {
       if (popupWindow && !popupWindow.closed) {
         const p = popupWindow.document.getElementById("texto");
-        p.innerText = trechos[currentIndex] || "";
+        const grupo = getCurrentGroup();
+        p.innerText = grupo.join('\n') || "";
       }
     }
 
     function atualizarMiniaturas() {
       miniaturas.innerHTML = "";
-      for (let i = 0; i < trechos.length; i++) {
+      const totalGroups = Math.ceil(trechos.length / groupSize);
+      for (let i = 0; i < totalGroups; i++) {
         const div = document.createElement("div");
         div.className = "miniatura";
-        if (i === currentIndex) div.classList.add("atual");
-        div.innerText = trechos[i];
+        if (i === currentGroupIndex) div.classList.add("atual");
+        const grupoTexto = trechos.slice(i * groupSize, i * groupSize + groupSize).join(' / ');
+        div.innerText = grupoTexto.length > 50 ? grupoTexto.slice(0, 47) + '...' : grupoTexto;
+        div.title = grupoTexto;
         div.onclick = () => {
-          currentIndex = i;
-          avancadoPorVoz = false; // resetar controle ao mudar manualmente
+          currentGroupIndex = i;
+          avancadoPorVoz = false;
           atualizarTela();
         };
         miniaturas.appendChild(div);
@@ -167,17 +183,18 @@
     }
 
     function avancar() {
-      if (currentIndex < trechos.length - 1) {
-        currentIndex++;
-        avancadoPorVoz = false; // resetar controle ao avançar manualmente
+      const totalGroups = Math.ceil(trechos.length / groupSize);
+      if (currentGroupIndex < totalGroups - 1) {
+        currentGroupIndex++;
+        avancadoPorVoz = false;
         atualizarTela();
       }
     }
 
     function voltar() {
-      if (currentIndex > 0) {
-        currentIndex--;
-        avancadoPorVoz = false; // resetar controle ao voltar manualmente
+      if (currentGroupIndex > 0) {
+        currentGroupIndex--;
+        avancadoPorVoz = false;
         atualizarTela();
       }
     }
@@ -210,35 +227,39 @@
         const falado = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
         console.log("Falado:", falado);
 
-        // Buscar correspondência nos 10 trechos antes e depois
+        // Buscar correspondência nos 10 grupos antes e depois (em trechos)
+        const totalGroups = Math.ceil(trechos.length / groupSize);
         let encontrado = -1;
-        const start = Math.max(0, currentIndex - 10);
-        const end = Math.min(trechos.length - 1, currentIndex + 10);
+        const startGroup = Math.max(0, currentGroupIndex - 10);
+        const endGroup = Math.min(totalGroups - 1, currentGroupIndex + 10);
 
-        for (let i = start; i <= end; i++) {
-          const trechoLower = trechos[i].toLowerCase();
-          if (falado.includes(trechoLower.slice(0, 10))) {
+        for (let i = startGroup; i <= endGroup; i++) {
+          const grupo = trechos.slice(i * groupSize, i * groupSize + groupSize).join(' ').toLowerCase();
+          if (falado.includes(grupo.slice(0, 15))) {
             encontrado = i;
             break;
           }
         }
 
-        if (encontrado >= 0 && encontrado !== currentIndex) {
-          currentIndex = encontrado;
-          avancadoPorVoz = false; // resetar controle ao mudar por voz
+        if (encontrado >= 0 && encontrado !== currentGroupIndex) {
+          currentGroupIndex = encontrado;
+          avancadoPorVoz = false;
           atualizarTela();
           return;
         }
 
-        // Avançar ao detectar a penúltima palavra, evitando múltiplos avanços seguidos
-        const trechoAtualTexto = trechos[currentIndex]?.toLowerCase();
-        if (trechoAtualTexto && !avancadoPorVoz) {
-          const palavras = trechoAtualTexto.split(/\s+/);
-          if (palavras.length >= 2) {
-            const penultimaPalavra = palavras[palavras.length - 2];
-            if (falado.includes(penultimaPalavra)) {
-              avancadoPorVoz = true;
-              avancar();
+        // Avançar ao detectar a penúltima palavra do último trecho do grupo atual
+        if (!avancadoPorVoz) {
+          const grupoAtual = getCurrentGroup();
+          if (grupoAtual.length > 0) {
+            const ultimoTrecho = grupoAtual[grupoAtual.length - 1].toLowerCase();
+            const palavras = ultimoTrecho.split(/\s+/);
+            if (palavras.length >= 2) {
+              const penultimaPalavra = palavras[palavras.length - 2];
+              if (falado.includes(penultimaPalavra)) {
+                avancadoPorVoz = true;
+                avancar();
+              }
             }
           }
         }
