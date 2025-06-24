@@ -18,6 +18,9 @@
       border-radius: 6px;
       background: #2a2a2a;
       color: #f1f1f1;
+      max-width: 200px;
+      word-wrap: break-word;
+      white-space: normal;
     }
     .miniatura:hover {
       background-color: #444;
@@ -31,6 +34,8 @@
       display: flex;
       flex-wrap: wrap;
       gap: 4px;
+      max-height: 300px;
+      overflow-y: auto;
     }
     .botoes button {
       margin: 0 4px;
@@ -42,6 +47,8 @@
       padding: 10px;
       border-radius: 6px;
       margin-bottom: 10px;
+      white-space: normal;
+      word-break: break-word;
     }
   </style>
 </head>
@@ -63,7 +70,7 @@
     </section>
 
     <section id="proximosContainer">
-      <h2>Contexto (Anteriores e Próximos)</h2>
+      <h2>Contexto (Todos os Trechos)</h2>
       <div id="miniaturas"></div>
     </section>
   </div>
@@ -97,17 +104,39 @@
 
     abrirPopUpBtn.onclick = () => {
       popupWindow = window.open("", "Telão", "width=800,height=600");
-      popupWindow.document.body.style.background = "black";
-      popupWindow.document.body.style.color = "white";
-      popupWindow.document.body.style.fontSize = "3em";
-      popupWindow.document.body.style.display = "flex";
-      popupWindow.document.body.style.justifyContent = "center";
-      popupWindow.document.body.style.alignItems = "center";
-      popupWindow.document.body.style.textAlign = "center";
-      popupWindow.document.body.innerHTML = "<p id='texto'></p>";
+      const doc = popupWindow.document;
+      doc.head.innerHTML = `
+        <title>Telão</title>
+        <style>
+          body {
+            margin: 0;
+            background: black;
+            color: white;
+            font-size: 2.5em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            word-break: break-word;
+            white-space: normal;
+            overflow-wrap: break-word;
+            height: 100vh;
+            box-sizing: border-box;
+          }
+          #texto {
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            white-space: normal;
+          }
+        </style>
+      `;
+      doc.body.innerHTML = `<p id="texto"></p>`;
 
       atualizarTelao();
-    }
+    };
 
     function atualizarTela() {
       trechoAtual.innerText = trechos[currentIndex] || "";
@@ -124,8 +153,8 @@
 
     function atualizarMiniaturas() {
       miniaturas.innerHTML = "";
-      for (let i = currentIndex - 5; i <= currentIndex + 5; i++) {
-        if (i < 0 || i >= trechos.length) continue;
+      // Mostrar todos os trechos
+      for (let i = 0; i < trechos.length; i++) {
         const div = document.createElement("div");
         div.className = "miniatura";
         if (i === currentIndex) div.classList.add("atual");
@@ -180,9 +209,15 @@
         const falado = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
         console.log("Falado:", falado);
 
+        // Procurar correspondência nos 10 trechos antes e 10 depois do atual
         let encontrado = -1;
-        for (let i = Math.max(0, currentIndex - 3); i <= Math.min(trechos.length - 1, currentIndex + 3); i++) {
-          if (falado.includes(trechos[i].toLowerCase().slice(0, 10))) {
+        const start = Math.max(0, currentIndex - 10);
+        const end = Math.min(trechos.length - 1, currentIndex + 10);
+
+        for (let i = start; i <= end; i++) {
+          const trechoLower = trechos[i].toLowerCase();
+          // Verifica se o trecho está contido nas primeiras 10 letras faladas (ajustado para evitar falsos positivos)
+          if (falado.includes(trechoLower.slice(0, 10))) {
             encontrado = i;
             break;
           }
@@ -191,13 +226,18 @@
         if (encontrado >= 0 && encontrado !== currentIndex) {
           currentIndex = encontrado;
           atualizarTela();
+          return; // Para evitar avançar duas vezes ao mesmo tempo
         }
 
+        // Verifica se o locutor falou a última palavra do trecho atual para avançar automaticamente
         const trechoAtualTexto = trechos[currentIndex]?.toLowerCase();
-        if (trechoAtualTexto && falado.includes(trechoAtualTexto.slice(0, Math.floor(trechoAtualTexto.length * 0.8)))) {
-          setTimeout(() => {
+        if (trechoAtualTexto) {
+          const palavras = trechoAtualTexto.split(/\s+/);
+          const ultimaPalavra = palavras[palavras.length - 1];
+
+          if (falado.includes(ultimaPalavra)) {
             avancar();
-          }, 100); // Ajustado para 0.1 segundo (100ms)
+          }
         }
       };
 
