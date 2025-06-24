@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Modo Diretor - Telão Interativo com Exibição de Tag Isolada</title>
+  <title>Modo Diretor - Telão Interativo (TAG Slide Único)</title>
   <style>
     body {
       background-color: #1c1c1c;
@@ -52,16 +52,6 @@
       min-height: 7.5em;
       line-height: 1.5em;
     }
-    #tagSelector {
-      margin: 10px 0 20px 0;
-      padding: 6px 8px;
-      font-size: 1em;
-      border-radius: 6px;
-      border: none;
-      background: #2a2a2a;
-      color: white;
-      width: 250px;
-    }
   </style>
 </head>
 <body>
@@ -70,15 +60,10 @@
       <h1>Modo Diretor - Telão Interativo</h1>
       <input type="file" id="fileInput" accept=".txt" />
       <button id="abrirPopUp" disabled>Abrir Telão</button>
-      <br />
-      <label for="tagSelector">Exibir tag isolada (opcional):</label>
-      <select id="tagSelector" disabled>
-        <option value="">-- Nenhuma (sequência normal) --</option>
-      </select>
     </header>
 
     <section id="trechoAtualContainer">
-      <h2>Trecho Atual (5 linhas por slide)</h2>
+      <h2>Trecho Atual</h2>
       <div id="trechoAtual">Carregue o arquivo .txt</div>
       <div class="botoes">
         <button id="voltarBtn">⬅️ Voltar</button>
@@ -93,18 +78,11 @@
   </div>
 
   <script>
-    let trechosOriginais = [];
-    let trechosFiltrados = [];
-    let currentGroupIndex = 0;
-    const groupSize = 5;
+    let slides = [];
+    let currentSlideIndex = 0;
     let popupWindow = null;
     let avancadoPorVoz = false;
-
-    // Controle para exibir tag isolada ou sequência normal
-    let tagIsoladaSelecionada = "";
-    let exibindoTagIsolada = false;
-    let grupoTagIsolada = [];
-    let grupoSequenciaNormal = [];
+    const groupSize = 5;
 
     const fileInput = document.getElementById("fileInput");
     const abrirPopUpBtn = document.getElementById("abrirPopUp");
@@ -112,7 +90,6 @@
     const miniaturas = document.getElementById("miniaturas");
     const avancarBtn = document.getElementById("avancarBtn");
     const voltarBtn = document.getElementById("voltarBtn");
-    const tagSelector = document.getElementById("tagSelector");
 
     fileInput.addEventListener("change", function (event) {
       const file = event.target.files[0];
@@ -120,61 +97,45 @@
 
       reader.onload = function (e) {
         const texto = e.target.result;
-        trechosOriginais = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-        popularTags();
-        tagSelector.disabled = false;
+        slides = processarSlides(texto);
+        currentSlideIndex = 0;
+        avancadoPorVoz = false;
         abrirPopUpBtn.disabled = false;
-        resetExibicao();
+        atualizarTela();
         startReconhecimento();
       };
 
       reader.readAsText(file);
     });
 
-    function popularTags() {
-      const tagsSet = new Set();
-      const regexTag = /^\[(.+?)\]/;
-      trechosOriginais.forEach(trecho => {
-        const match = trecho.match(regexTag);
-        if (match) tagsSet.add(match[1]);
+    // Função para processar o arquivo e criar slides conforme a regra das TAGs
+    function processarSlides(texto) {
+      const linhas = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+      const slides = [];
+      let buffer = [];
+
+      linhas.forEach(linha => {
+        if (/^\[.+?\]/.test(linha)) {
+          // Se houver linhas acumuladas, cria um slide com elas
+          if (buffer.length > 0) {
+            slides.push(buffer.join('\n'));
+            buffer = [];
+          }
+          // Slide único para a linha com TAG (remove os colchetes)
+          slides.push(linha.replace(/^\[(.+?)\]\s*/, '').trim());
+        } else {
+          buffer.push(linha);
+          if (buffer.length === groupSize) {
+            slides.push(buffer.join('\n'));
+            buffer = [];
+          }
+        }
       });
-      tagSelector.innerHTML = '<option value="">-- Nenhuma (sequência normal) --</option>';
-      Array.from(tagsSet).sort().forEach(tag => {
-        const option = document.createElement("option");
-        option.value = tag;
-        option.textContent = tag;
-        tagSelector.appendChild(option);
-      });
-    }
-
-    tagSelector.addEventListener("change", () => {
-      tagIsoladaSelecionada = tagSelector.value;
-      resetExibicao();
-    });
-
-    function resetExibicao() {
-      avancadoPorVoz = false;
-      currentGroupIndex = 0;
-      exibindoTagIsolada = !!tagIsoladaSelecionada;
-
-      if (exibindoTagIsolada) {
-        // Filtra trechos da tag isolada, removendo a tag visualmente
-        const prefixo = `[${tagIsoladaSelecionada}]`;
-        grupoTagIsolada = trechosOriginais
-          .filter(trecho => trecho.startsWith(prefixo))
-          .map(trecho => trecho.replace(prefixo, '').trim());
-        // Cria grupo sequencial normal removendo trechos da tag isolada
-        grupoSequenciaNormal = trechosOriginais
-          .filter(trecho => !trecho.startsWith(prefixo))
-          .map(trecho => trecho.replace(/^\[.+?\]/, '').trim());
-        trechosFiltrados = grupoTagIsolada.length > 0 ? grupoTagIsolada : grupoSequenciaNormal;
-      } else {
-        // Exibe todos os trechos sem filtro, removendo tags visuais
-        grupoTagIsolada = [];
-        grupoSequenciaNormal = [];
-        trechosFiltrados = trechosOriginais.map(trecho => trecho.replace(/^\[.+?\]/, '').trim());
+      // Adiciona o restante do buffer como último slide, se houver
+      if (buffer.length > 0) {
+        slides.push(buffer.join('\n'));
       }
-      atualizarTela();
+      return slides;
     }
 
     abrirPopUpBtn.onclick = () => {
@@ -213,14 +174,8 @@
       atualizarTelao();
     };
 
-    function getCurrentGroup() {
-      const start = currentGroupIndex * groupSize;
-      return trechosFiltrados.slice(start, start + groupSize);
-    }
-
     function atualizarTela() {
-      const grupo = getCurrentGroup();
-      trechoAtual.innerText = grupo.join('\n') || "";
+      trechoAtual.innerText = slides[currentSlideIndex] || "";
       atualizarTelao();
       atualizarMiniaturas();
     }
@@ -228,26 +183,24 @@
     function atualizarTelao() {
       if (popupWindow && !popupWindow.closed) {
         const p = popupWindow.document.getElementById("texto");
-        const grupo = getCurrentGroup();
-        p.innerText = grupo.join('\n') || "";
+        p.innerText = slides[currentSlideIndex] || "";
       }
     }
 
     function atualizarMiniaturas() {
       miniaturas.innerHTML = "";
-      const totalGroups = Math.ceil(trechosFiltrados.length / groupSize);
       let atualDiv = null;
-      for (let i = 0; i < totalGroups; i++) {
+      for (let i = 0; i < slides.length; i++) {
         const div = document.createElement("div");
         div.className = "miniatura";
-        if (i === currentGroupIndex) {
+        if (i === currentSlideIndex) {
           div.classList.add("atual");
           atualDiv = div;
         }
-        div.innerText = trechosFiltrados.slice(i * groupSize, i * groupSize + groupSize).join('\n');
-        div.title = div.innerText;
+        div.innerText = slides[i];
+        div.title = slides[i];
         div.onclick = () => {
-          currentGroupIndex = i;
+          currentSlideIndex = i;
           avancadoPorVoz = false;
           atualizarTela();
         };
@@ -267,24 +220,16 @@
     }
 
     function avancar() {
-      const totalGroups = Math.ceil(trechosFiltrados.length / groupSize);
-      if (currentGroupIndex < totalGroups - 1) {
-        currentGroupIndex++;
-        avancadoPorVoz = false;
-        atualizarTela();
-      } else if (exibindoTagIsolada) {
-        // Terminou a tag isolada, volta para sequência normal
-        exibindoTagIsolada = false;
-        trechosFiltrados = grupoSequenciaNormal;
-        currentGroupIndex = 0;
+      if (currentSlideIndex < slides.length - 1) {
+        currentSlideIndex++;
         avancadoPorVoz = false;
         atualizarTela();
       }
     }
 
     function voltar() {
-      if (currentGroupIndex > 0) {
-        currentGroupIndex--;
+      if (currentSlideIndex > 0) {
+        currentSlideIndex--;
         avancadoPorVoz = false;
         atualizarTela();
       }
@@ -316,44 +261,41 @@
 
       recognition.onresult = function (event) {
         const falado = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
-        const totalGroups = Math.ceil(trechosFiltrados.length / groupSize);
         let encontrado = -1;
-        const startGroup = Math.max(0, currentGroupIndex - 10);
-        const endGroup = Math.min(totalGroups - 1, currentGroupIndex + 10);
+        const startSlide = Math.max(0, currentSlideIndex - 10);
+        const endSlide = Math.min(slides.length - 1, currentSlideIndex + 10);
 
-        for (let i = startGroup; i <= endGroup; i++) {
-          const grupo = trechosFiltrados.slice(i * groupSize, i * groupSize + groupSize).join(' ').toLowerCase();
-          if (falado.includes(grupo.slice(0, 15))) {
+        for (let i = startSlide; i <= endSlide; i++) {
+          const slideTexto = slides[i].toLowerCase();
+          if (falado.includes(slideTexto.slice(0, 15))) {
             encontrado = i;
             break;
           }
         }
 
-        if (encontrado >= 0 && encontrado !== currentGroupIndex) {
-          currentGroupIndex = encontrado;
+        if (encontrado >= 0 && encontrado !== currentSlideIndex) {
+          currentSlideIndex = encontrado;
           avancadoPorVoz = false;
           atualizarTela();
           return;
         }
 
+        // Avançar se pelo menos 70% do texto do slide foi reconhecido
         if (!avancadoPorVoz) {
-          const grupoAtual = getCurrentGroup();
-          if (grupoAtual.length > 0) {
-            const textoGrupo = grupoAtual.join(' ').toLowerCase().replace(/[^\w\s]/gi, '');
-            const faladoLimpo = falado.replace(/[^\w\s]/gi, '');
-            const palavrasTexto = textoGrupo.split(/\s+/).filter(Boolean);
-            const palavrasFaladas = faladoLimpo.split(/\s+/).filter(Boolean);
+          const textoSlide = slides[currentSlideIndex].toLowerCase().replace(/[^\w\s]/gi, '');
+          const faladoLimpo = falado.replace(/[^\w\s]/gi, '');
+          const palavrasTexto = textoSlide.split(/\s+/).filter(Boolean);
+          const palavrasFaladas = faladoLimpo.split(/\s+/).filter(Boolean);
 
-            let acertos = 0;
-            palavrasTexto.forEach(palavra => {
-              if (palavrasFaladas.includes(palavra)) acertos++;
-            });
+          let acertos = 0;
+          palavrasTexto.forEach(palavra => {
+            if (palavrasFaladas.includes(palavra)) acertos++;
+          });
 
-            const percentual = acertos / palavrasTexto.length;
-            if (percentual >= 0.7) {
-              avancadoPorVoz = true;
-              avancar();
-            }
+          const percentual = acertos / palavrasTexto.length;
+          if (percentual >= 0.7) {
+            avancadoPorVoz = true;
+            avancar();
           }
         }
       };
