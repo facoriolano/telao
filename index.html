@@ -34,8 +34,9 @@
       display: flex;
       flex-wrap: wrap;
       gap: 4px;
-      max-height: 300px;
-      overflow-y: auto;
+      /* Removida a altura máxima e overflow para mostrar todos os slides sem barra vertical */
+      /* max-height: 300px; */
+      /* overflow-y: auto; */
     }
     .botoes button {
       margin: 0 4px;
@@ -123,10 +124,12 @@
             overflow-wrap: break-word;
             height: 100vh;
             box-sizing: border-box;
+            /* Aumenta a altura para caber mais linhas */
+            line-height: 1.4em;
           }
           #texto {
             max-width: 90vw;
-            max-height: 90vh;
+            max-height: 85vh; /* aumentada para mais linhas */
             overflow-wrap: break-word;
             word-break: break-word;
             white-space: normal;
@@ -153,7 +156,7 @@
 
     function atualizarMiniaturas() {
       miniaturas.innerHTML = "";
-      // Mostrar todos os trechos
+      // Mostrar todos os trechos sem rolagem
       for (let i = 0; i < trechos.length; i++) {
         const div = document.createElement("div");
         div.className = "miniatura";
@@ -216,7 +219,6 @@
 
         for (let i = start; i <= end; i++) {
           const trechoLower = trechos[i].toLowerCase();
-          // Verifica se o trecho está contido nas primeiras 10 letras faladas (ajustado para evitar falsos positivos)
           if (falado.includes(trechoLower.slice(0, 10))) {
             encontrado = i;
             break;
@@ -226,17 +228,18 @@
         if (encontrado >= 0 && encontrado !== currentIndex) {
           currentIndex = encontrado;
           atualizarTela();
-          return; // Para evitar avançar duas vezes ao mesmo tempo
+          return;
         }
 
-        // Verifica se o locutor falou a última palavra do trecho atual para avançar automaticamente
+        // Avança assim que detectar a penúltima palavra falada do trecho atual
         const trechoAtualTexto = trechos[currentIndex]?.toLowerCase();
         if (trechoAtualTexto) {
           const palavras = trechoAtualTexto.split(/\s+/);
-          const ultimaPalavra = palavras[palavras.length - 1];
-
-          if (falado.includes(ultimaPalavra)) {
-            avancar();
+          if (palavras.length >= 2) {
+            const penultimaPalavra = palavras[palavras.length - 2];
+            if (falado.includes(penultimaPalavra)) {
+              avancar();
+            }
           }
         }
       };
