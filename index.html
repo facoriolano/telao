@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <title>Modo Diretor - Telão Interativo</title>
-  <link rel="stylesheet" href="style.css" />
   <style>
     body {
       background-color: #1c1c1c;
@@ -34,9 +33,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 4px;
-      /* Removida a altura máxima e overflow para mostrar todos os slides sem barra vertical */
-      /* max-height: 300px; */
-      /* overflow-y: auto; */
+      /* Removida altura e overflow para mostrar todos os slides */
     }
     .botoes button {
       margin: 0 4px;
@@ -80,6 +77,7 @@
     let trechos = [];
     let currentIndex = 0;
     let popupWindow = null;
+    let avancadoPorVoz = false; // controle para evitar avanços múltiplos seguidos
 
     const fileInput = document.getElementById("fileInput");
     const abrirPopUpBtn = document.getElementById("abrirPopUp");
@@ -124,12 +122,11 @@
             overflow-wrap: break-word;
             height: 100vh;
             box-sizing: border-box;
-            /* Aumenta a altura para caber mais linhas */
-            line-height: 1.4em;
+            line-height: 1.6em; /* aumenta espaçamento para melhor leitura de 5 linhas */
           }
           #texto {
             max-width: 90vw;
-            max-height: 85vh; /* aumentada para mais linhas */
+            max-height: 130vh; /* altura maior para caber 5 linhas */
             overflow-wrap: break-word;
             word-break: break-word;
             white-space: normal;
@@ -137,7 +134,6 @@
         </style>
       `;
       doc.body.innerHTML = `<p id="texto"></p>`;
-
       atualizarTelao();
     };
 
@@ -156,7 +152,6 @@
 
     function atualizarMiniaturas() {
       miniaturas.innerHTML = "";
-      // Mostrar todos os trechos sem rolagem
       for (let i = 0; i < trechos.length; i++) {
         const div = document.createElement("div");
         div.className = "miniatura";
@@ -164,6 +159,7 @@
         div.innerText = trechos[i];
         div.onclick = () => {
           currentIndex = i;
+          avancadoPorVoz = false; // resetar controle ao mudar manualmente
           atualizarTela();
         };
         miniaturas.appendChild(div);
@@ -173,6 +169,7 @@
     function avancar() {
       if (currentIndex < trechos.length - 1) {
         currentIndex++;
+        avancadoPorVoz = false; // resetar controle ao avançar manualmente
         atualizarTela();
       }
     }
@@ -180,6 +177,7 @@
     function voltar() {
       if (currentIndex > 0) {
         currentIndex--;
+        avancadoPorVoz = false; // resetar controle ao voltar manualmente
         atualizarTela();
       }
     }
@@ -212,7 +210,7 @@
         const falado = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
         console.log("Falado:", falado);
 
-        // Procurar correspondência nos 10 trechos antes e 10 depois do atual
+        // Buscar correspondência nos 10 trechos antes e depois
         let encontrado = -1;
         const start = Math.max(0, currentIndex - 10);
         const end = Math.min(trechos.length - 1, currentIndex + 10);
@@ -227,17 +225,19 @@
 
         if (encontrado >= 0 && encontrado !== currentIndex) {
           currentIndex = encontrado;
+          avancadoPorVoz = false; // resetar controle ao mudar por voz
           atualizarTela();
           return;
         }
 
-        // Avança assim que detectar a penúltima palavra falada do trecho atual
+        // Avançar ao detectar a penúltima palavra, evitando múltiplos avanços seguidos
         const trechoAtualTexto = trechos[currentIndex]?.toLowerCase();
-        if (trechoAtualTexto) {
+        if (trechoAtualTexto && !avancadoPorVoz) {
           const palavras = trechoAtualTexto.split(/\s+/);
           if (palavras.length >= 2) {
             const penultimaPalavra = palavras[palavras.length - 2];
             if (falado.includes(penultimaPalavra)) {
+              avancadoPorVoz = true;
               avancar();
             }
           }
