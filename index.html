@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Modo Diretor - Telão Interativo com Filtro por Tag</title>
+  <title>Modo Diretor - Telão Interativo</title>
   <style>
     body {
       background-color: #1c1c1c;
@@ -52,29 +52,14 @@
       min-height: 7.5em;
       line-height: 1.5em;
     }
-    #tagSelector {
-      margin: 10px 0 20px 0;
-      padding: 6px 8px;
-      font-size: 1em;
-      border-radius: 6px;
-      border: none;
-      background: #2a2a2a;
-      color: white;
-      width: 250px;
-    }
   </style>
 </head>
 <body>
   <div id="painel">
     <header>
-      <h1>Modo Diretor - Telão Interativo</h1>
+      <h1>Modo Diretor</h1>
       <input type="file" id="fileInput" accept=".txt" />
       <button id="abrirPopUp" disabled>Abrir Telão</button>
-      <br />
-      <label for="tagSelector">Filtrar por tag:</label>
-      <select id="tagSelector" disabled>
-        <option value="">-- Mostrar todos os trechos --</option>
-      </select>
     </header>
 
     <section id="trechoAtualContainer">
@@ -93,13 +78,11 @@
   </div>
 
   <script>
-    let trechosOriginais = [];
-    let trechosFiltrados = [];
+    let trechos = [];
     let currentGroupIndex = 0;
     const groupSize = 5;
     let popupWindow = null;
     let avancadoPorVoz = false;
-    let tagSelecionada = "";
 
     const fileInput = document.getElementById("fileInput");
     const abrirPopUpBtn = document.getElementById("abrirPopUp");
@@ -107,7 +90,6 @@
     const miniaturas = document.getElementById("miniaturas");
     const avancarBtn = document.getElementById("avancarBtn");
     const voltarBtn = document.getElementById("voltarBtn");
-    const tagSelector = document.getElementById("tagSelector");
 
     fileInput.addEventListener("change", function (event) {
       const file = event.target.files[0];
@@ -115,54 +97,15 @@
 
       reader.onload = function (e) {
         const texto = e.target.result;
-        trechosOriginais = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-        popularTags();
-        aplicarFiltroTag();
+        trechos = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
         abrirPopUpBtn.disabled = false;
-        tagSelector.disabled = false;
+        currentGroupIndex = 0;
+        avancadoPorVoz = false;
+        atualizarTela();
         startReconhecimento();
       };
 
       reader.readAsText(file);
-    });
-
-    // Extrai todas as tags únicas encontradas no arquivo para popular o seletor
-    function popularTags() {
-      const tagsSet = new Set();
-      const regexTag = /^\[(.+?)\]/; // captura texto entre colchetes no início da linha
-      trechosOriginais.forEach(trecho => {
-        const match = trecho.match(regexTag);
-        if (match) tagsSet.add(match[1]);
-      });
-      // Limpa e adiciona opções no select
-      tagSelector.innerHTML = '<option value="">-- Mostrar todos os trechos --</option>';
-      Array.from(tagsSet).sort().forEach(tag => {
-        const option = document.createElement("option");
-        option.value = tag;
-        option.textContent = tag;
-        tagSelector.appendChild(option);
-      });
-    }
-
-    // Aplica filtro baseado na tag selecionada e atualiza trechosFiltrados
-    function aplicarFiltroTag() {
-      tagSelecionada = tagSelector.value;
-      if (tagSelecionada) {
-        const prefixo = `[${tagSelecionada}]`;
-        trechosFiltrados = trechosOriginais
-          .filter(trecho => trecho.startsWith(prefixo))
-          .map(trecho => trecho.replace(prefixo, '').trim());
-      } else {
-        // Sem filtro, mostra todos os trechos originais, removendo tags se existirem
-        trechosFiltrados = trechosOriginais.map(trecho => trecho.replace(/^\[.+?\]/, '').trim());
-      }
-      currentGroupIndex = 0;
-      avancadoPorVoz = false;
-      atualizarTela();
-    }
-
-    tagSelector.addEventListener("change", () => {
-      aplicarFiltroTag();
     });
 
     abrirPopUpBtn.onclick = () => {
@@ -203,7 +146,7 @@
 
     function getCurrentGroup() {
       const start = currentGroupIndex * groupSize;
-      return trechosFiltrados.slice(start, start + groupSize);
+      return trechos.slice(start, start + groupSize);
     }
 
     function atualizarTela() {
@@ -223,7 +166,7 @@
 
     function atualizarMiniaturas() {
       miniaturas.innerHTML = "";
-      const totalGroups = Math.ceil(trechosFiltrados.length / groupSize);
+      const totalGroups = Math.ceil(trechos.length / groupSize);
       let atualDiv = null;
       for (let i = 0; i < totalGroups; i++) {
         const div = document.createElement("div");
@@ -232,7 +175,8 @@
           div.classList.add("atual");
           atualDiv = div;
         }
-        div.innerText = trechosFiltrados.slice(i * groupSize, i * groupSize + groupSize).join('\n');
+        // Miniatura mostra o texto completo do grupo (todas as 5 linhas)
+        div.innerText = trechos.slice(i * groupSize, i * groupSize + groupSize).join('\n');
         div.title = div.innerText;
         div.onclick = () => {
           currentGroupIndex = i;
@@ -241,11 +185,13 @@
         };
         miniaturas.appendChild(div);
       }
+      // Só rola se o slide atual não estiver visível
       if (atualDiv && !isElementInViewport(atualDiv)) {
         atualDiv.scrollIntoView({block: "nearest", behavior: "smooth"});
       }
     }
 
+    // Verifica se o elemento está visível na tela
     function isElementInViewport(el) {
       const rect = el.getBoundingClientRect();
       return (
@@ -255,7 +201,7 @@
     }
 
     function avancar() {
-      const totalGroups = Math.ceil(trechosFiltrados.length / groupSize);
+      const totalGroups = Math.ceil(trechos.length / groupSize);
       if (currentGroupIndex < totalGroups - 1) {
         currentGroupIndex++;
         avancadoPorVoz = false;
@@ -297,13 +243,14 @@
 
       recognition.onresult = function (event) {
         const falado = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
-        const totalGroups = Math.ceil(trechosFiltrados.length / groupSize);
+        // Buscar correspondência nos 10 grupos antes e depois (em trechos)
+        const totalGroups = Math.ceil(trechos.length / groupSize);
         let encontrado = -1;
         const startGroup = Math.max(0, currentGroupIndex - 10);
         const endGroup = Math.min(totalGroups - 1, currentGroupIndex + 10);
 
         for (let i = startGroup; i <= endGroup; i++) {
-          const grupo = trechosFiltrados.slice(i * groupSize, i * groupSize + groupSize).join(' ').toLowerCase();
+          const grupo = trechos.slice(i * groupSize, i * groupSize + groupSize).join(' ').toLowerCase();
           if (falado.includes(grupo.slice(0, 15))) {
             encontrado = i;
             break;
@@ -317,6 +264,7 @@
           return;
         }
 
+        // Avançar se pelo menos 70% do texto do grupo foi reconhecido
         if (!avancadoPorVoz) {
           const grupoAtual = getCurrentGroup();
           if (grupoAtual.length > 0) {
