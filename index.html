@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Modo Diretor - Telão Interativo</title>
+  <title>Modo Diretor - Telão Interativo com Exibição de Tag Isolada</title>
   <style>
     body {
       background-color: #1c1c1c;
@@ -52,14 +52,29 @@
       min-height: 7.5em;
       line-height: 1.5em;
     }
+    #tagSelector {
+      margin: 10px 0 20px 0;
+      padding: 6px 8px;
+      font-size: 1em;
+      border-radius: 6px;
+      border: none;
+      background: #2a2a2a;
+      color: white;
+      width: 250px;
+    }
   </style>
 </head>
 <body>
   <div id="painel">
     <header>
-      <h1>Modo Diretor</h1>
+      <h1>Modo Diretor - Telão Interativo</h1>
       <input type="file" id="fileInput" accept=".txt" />
       <button id="abrirPopUp" disabled>Abrir Telão</button>
+      <br />
+      <label for="tagSelector">Exibir tag isolada (opcional):</label>
+      <select id="tagSelector" disabled>
+        <option value="">-- Nenhuma (sequência normal) --</option>
+      </select>
     </header>
 
     <section id="trechoAtualContainer">
@@ -78,11 +93,18 @@
   </div>
 
   <script>
-    let trechos = [];
+    let trechosOriginais = [];
+    let trechosFiltrados = [];
     let currentGroupIndex = 0;
     const groupSize = 5;
     let popupWindow = null;
     let avancadoPorVoz = false;
+
+    // Controle para exibir tag isolada ou sequência normal
+    let tagIsoladaSelecionada = "";
+    let exibindoTagIsolada = false;
+    let grupoTagIsolada = [];
+    let grupoSequenciaNormal = [];
 
     const fileInput = document.getElementById("fileInput");
     const abrirPopUpBtn = document.getElementById("abrirPopUp");
@@ -90,6 +112,7 @@
     const miniaturas = document.getElementById("miniaturas");
     const avancarBtn = document.getElementById("avancarBtn");
     const voltarBtn = document.getElementById("voltarBtn");
+    const tagSelector = document.getElementById("tagSelector");
 
     fileInput.addEventListener("change", function (event) {
       const file = event.target.files[0];
@@ -97,16 +120,62 @@
 
       reader.onload = function (e) {
         const texto = e.target.result;
-        trechos = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+        trechosOriginais = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+        popularTags();
+        tagSelector.disabled = false;
         abrirPopUpBtn.disabled = false;
-        currentGroupIndex = 0;
-        avancadoPorVoz = false;
-        atualizarTela();
+        resetExibicao();
         startReconhecimento();
       };
 
       reader.readAsText(file);
     });
+
+    function popularTags() {
+      const tagsSet = new Set();
+      const regexTag = /^\[(.+?)\]/;
+      trechosOriginais.forEach(trecho => {
+        const match = trecho.match(regexTag);
+        if (match) tagsSet.add(match[1]);
+      });
+      tagSelector.innerHTML = '<option value="">-- Nenhuma (sequência normal) --</option>';
+      Array.from(tagsSet).sort().forEach(tag => {
+        const option = document.createElement("option");
+        option.value = tag;
+        option.textContent = tag;
+        tagSelector.appendChild(option);
+      });
+    }
+
+    tagSelector.addEventListener("change", () => {
+      tagIsoladaSelecionada = tagSelector.value;
+      resetExibicao();
+    });
+
+    function resetExibicao() {
+      avancadoPorVoz = false;
+      currentGroupIndex = 0;
+      exibindoTagIsolada = !!tagIsoladaSelecionada;
+
+      if (exibindoTagIsolada) {
+        // Filtra trechos da tag isolada, removendo a tag visualmente
+        const prefixo = `[${tagIsoladaSelecionada}]`;
+        grupoTagIsolada = trechosOriginais
+          .filter(trecho => trecho.startsWith(prefixo))
+          .map(trecho => trecho.replace(prefixo, '').trim());
+        // Cria grupo sequencial normal removendo trechos da tag isolada
+        grupoSequenciaNormal = trechosOriginais
+          .filter(trecho => !trecho.startsWith(prefixo))
+          .map(trecho => trecho.replace(/^\[.+?\]/, '').trim());
+        trechosFiltrados = grupoTagIsolada.length > 0 ? grupoTagIsolada : grupoSequenciaNormal;
+      } else {
+        // Exibe todos os trechos sem filtro, removendo tags visuais
+        grupoTagIsolada = [];
+        grupoSequenciaNormal = [];
+        trechosFiltrados = trechosOriginais.map(trecho => trecho.replace(/^\[.+?\]/, '').trim());
+      }
+      atualizarTela();
+    }
 
     abrirPopUpBtn.onclick = () => {
       popupWindow = window.open("", "Telão", "width=800,height=600");
@@ -146,7 +215,7 @@
 
     function getCurrentGroup() {
       const start = currentGroupIndex * groupSize;
-      return trechos.slice(start, start + groupSize);
+      return trechosFiltrados.slice(start, start + groupSize);
     }
 
     function atualizarTela() {
@@ -166,7 +235,7 @@
 
     function atualizarMiniaturas() {
       miniaturas.innerHTML = "";
-      const totalGroups = Math.ceil(trechos.length / groupSize);
+      const totalGroups = Math.ceil(trechosFiltrados.length / groupSize);
       let atualDiv = null;
       for (let i = 0; i < totalGroups; i++) {
         const div = document.createElement("div");
@@ -175,8 +244,7 @@
           div.classList.add("atual");
           atualDiv = div;
         }
-        // Miniatura mostra o texto completo do grupo (todas as 5 linhas)
-        div.innerText = trechos.slice(i * groupSize, i * groupSize + groupSize).join('\n');
+        div.innerText = trechosFiltrados.slice(i * groupSize, i * groupSize + groupSize).join('\n');
         div.title = div.innerText;
         div.onclick = () => {
           currentGroupIndex = i;
@@ -185,13 +253,11 @@
         };
         miniaturas.appendChild(div);
       }
-      // Só rola se o slide atual não estiver visível
       if (atualDiv && !isElementInViewport(atualDiv)) {
         atualDiv.scrollIntoView({block: "nearest", behavior: "smooth"});
       }
     }
 
-    // Verifica se o elemento está visível na tela
     function isElementInViewport(el) {
       const rect = el.getBoundingClientRect();
       return (
@@ -201,9 +267,16 @@
     }
 
     function avancar() {
-      const totalGroups = Math.ceil(trechos.length / groupSize);
+      const totalGroups = Math.ceil(trechosFiltrados.length / groupSize);
       if (currentGroupIndex < totalGroups - 1) {
         currentGroupIndex++;
+        avancadoPorVoz = false;
+        atualizarTela();
+      } else if (exibindoTagIsolada) {
+        // Terminou a tag isolada, volta para sequência normal
+        exibindoTagIsolada = false;
+        trechosFiltrados = grupoSequenciaNormal;
+        currentGroupIndex = 0;
         avancadoPorVoz = false;
         atualizarTela();
       }
@@ -243,14 +316,13 @@
 
       recognition.onresult = function (event) {
         const falado = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
-        // Buscar correspondência nos 10 grupos antes e depois (em trechos)
-        const totalGroups = Math.ceil(trechos.length / groupSize);
+        const totalGroups = Math.ceil(trechosFiltrados.length / groupSize);
         let encontrado = -1;
         const startGroup = Math.max(0, currentGroupIndex - 10);
         const endGroup = Math.min(totalGroups - 1, currentGroupIndex + 10);
 
         for (let i = startGroup; i <= endGroup; i++) {
-          const grupo = trechos.slice(i * groupSize, i * groupSize + groupSize).join(' ').toLowerCase();
+          const grupo = trechosFiltrados.slice(i * groupSize, i * groupSize + groupSize).join(' ').toLowerCase();
           if (falado.includes(grupo.slice(0, 15))) {
             encontrado = i;
             break;
@@ -264,7 +336,6 @@
           return;
         }
 
-        // Avançar se pelo menos 70% do texto do grupo foi reconhecido
         if (!avancadoPorVoz) {
           const grupoAtual = getCurrentGroup();
           if (grupoAtual.length > 0) {
