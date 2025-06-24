@@ -17,9 +17,12 @@
       border-radius: 6px;
       background: #2a2a2a;
       color: #f1f1f1;
-      max-width: 200px;
+      max-width: 300px;
+      min-width: 220px;
       word-wrap: break-word;
-      white-space: normal;
+      white-space: pre-line;
+      font-size: 1em;
+      display: block;
     }
     .miniatura:hover {
       background-color: #444;
@@ -45,9 +48,9 @@
       padding: 10px;
       border-radius: 6px;
       margin-bottom: 10px;
-      white-space: normal;
+      white-space: pre-line;
       word-break: break-word;
-      min-height: 7.5em; /* espaço para 5 linhas aproximadamente */
+      min-height: 7.5em;
       line-height: 1.5em;
     }
   </style>
@@ -78,9 +81,9 @@
   <script>
     let trechos = [];
     let currentGroupIndex = 0;
-    const groupSize = 5; // 5 trechos por slide
+    const groupSize = 5;
     let popupWindow = null;
-    let avancadoPorVoz = false; // controle para evitar múltiplos avanços seguidos
+    let avancadoPorVoz = false;
 
     const fileInput = document.getElementById("fileInput");
     const abrirPopUpBtn = document.getElementById("abrirPopUp");
@@ -123,19 +126,18 @@
             text-align: center;
             padding: 20px;
             word-break: break-word;
-            white-space: normal;
+            white-space: pre-line;
             overflow-wrap: break-word;
             height: 100vh;
             box-sizing: border-box;
-            line-height: 1.5em; /* espaçamento para 5 linhas */
+            line-height: 1.5em;
           }
           #texto {
             max-width: 90vw;
             max-height: 90vh;
             overflow-wrap: break-word;
             word-break: break-word;
-            white-space: normal;
-            white-space: pre-line; /* respeitar quebras de linha */
+            white-space: pre-line;
           }
         </style>
       `;
@@ -170,9 +172,9 @@
         const div = document.createElement("div");
         div.className = "miniatura";
         if (i === currentGroupIndex) div.classList.add("atual");
-        const grupoTexto = trechos.slice(i * groupSize, i * groupSize + groupSize).join(' / ');
-        div.innerText = grupoTexto.length > 50 ? grupoTexto.slice(0, 47) + '...' : grupoTexto;
-        div.title = grupoTexto;
+        // Miniatura mostra o texto completo do grupo (todas as 5 linhas)
+        div.innerText = trechos.slice(i * groupSize, i * groupSize + groupSize).join('\n');
+        div.title = div.innerText;
         div.onclick = () => {
           currentGroupIndex = i;
           avancadoPorVoz = false;
@@ -225,8 +227,6 @@
 
       recognition.onresult = function (event) {
         const falado = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
-        console.log("Falado:", falado);
-
         // Buscar correspondência nos 10 grupos antes e depois (em trechos)
         const totalGroups = Math.ceil(trechos.length / groupSize);
         let encontrado = -1;
@@ -248,18 +248,24 @@
           return;
         }
 
-        // Avançar ao detectar a penúltima palavra do último trecho do grupo atual
+        // Avançar se pelo menos 70% do texto do grupo foi reconhecido
         if (!avancadoPorVoz) {
           const grupoAtual = getCurrentGroup();
           if (grupoAtual.length > 0) {
-            const ultimoTrecho = grupoAtual[grupoAtual.length - 1].toLowerCase();
-            const palavras = ultimoTrecho.split(/\s+/);
-            if (palavras.length >= 2) {
-              const penultimaPalavra = palavras[palavras.length - 2];
-              if (falado.includes(penultimaPalavra)) {
-                avancadoPorVoz = true;
-                avancar();
-              }
+            const textoGrupo = grupoAtual.join(' ').toLowerCase().replace(/[^\w\s]/gi, '');
+            const faladoLimpo = falado.replace(/[^\w\s]/gi, '');
+            const palavrasTexto = textoGrupo.split(/\s+/).filter(Boolean);
+            const palavrasFaladas = faladoLimpo.split(/\s+/).filter(Boolean);
+
+            let acertos = 0;
+            palavrasTexto.forEach(palavra => {
+              if (palavrasFaladas.includes(palavra)) acertos++;
+            });
+
+            const percentual = acertos / palavrasTexto.length;
+            if (percentual >= 0.7) {
+              avancadoPorVoz = true;
+              avancar();
             }
           }
         }
