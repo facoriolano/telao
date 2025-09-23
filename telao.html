@@ -1,125 +1,31 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Telão - Slides Automáticos</title>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&family=Segoe+UI&display=swap" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <title>Telão</title>
   <style>
     body {
-      margin: 0;
-      font-family: 'Segoe UI', sans-serif;
-      background: radial-gradient(circle at center, #1a1a2e, #0f0f1f);
+      background: black;
       color: white;
+      font-size: 48px;
+      font-family: sans-serif;
       display: flex;
-      justify-content: center;
       align-items: center;
+      justify-content: center;
+      text-align: center;
       height: 100vh;
-    }
-    .slide {
-      display: none;
-      width: 90%;
-      max-width: 1000px;
-      padding: 20px;
-      background: rgba(0,0,0,0.5);
-      border-radius: 15px;
-      box-shadow: 0 0 20px rgba(255,0,150,0.7);
-    }
-    .slide.active {
-      display: block;
-      animation: fadeIn 0.5s ease-in-out;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .line {
-      margin: 10px 0;
-      font-size: 1.2em;
-    }
-    .controls {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 20px;
-    }
-    button {
-      background: #ff00aa;
-      border: none;
-      padding: 10px 20px;
-      font-size: 1em;
-      color: white;
-      border-radius: 8px;
-      cursor: pointer;
-      box-shadow: 0 0 10px rgba(255,0,170,0.6);
-    }
-    button:hover {
-      background: #ff33bb;
+      margin: 0;
+      padding: 40px;
     }
   </style>
 </head>
 <body>
-  <div id="slides"></div>
-
-  <div class="controls">
-    <button onclick="prevSlide()">⬅ Voltar</button>
-    <button onclick="nextSlide()">Avançar ➡</button>
-  </div>
+  <div id="texto"></div>
 
   <script>
-    let slidesData = [];
-    let currentSlide = 0;
-
-    // Carrega o TXT do GitHub
-    fetch("01.txt")
-      .then(res => res.text())
-      .then(text => {
-        const lines = text.split("\n").map(l => l.trim()).filter(l => l);
-        // Quebra em blocos de 5 linhas
-        for (let i = 0; i < lines.length; i += 5) {
-          slidesData.push(lines.slice(i, i + 5));
-        }
-        renderSlides();
-        showSlide(0);
-      });
-
-    function renderSlides() {
-      const slidesContainer = document.getElementById("slides");
-      slidesData.forEach((block, index) => {
-        const slide = document.createElement("div");
-        slide.className = "slide";
-        slide.id = "slide-" + index;
-        block.forEach(line => {
-          const p = document.createElement("div");
-          p.className = "line";
-          p.textContent = line;
-          slide.appendChild(p);
-        });
-        slidesContainer.appendChild(slide);
-      });
-    }
-
-    function showSlide(n) {
-      document.querySelectorAll(".slide").forEach(s => s.classList.remove("active"));
-      const slide = document.getElementById("slide-" + n);
-      if (slide) slide.classList.add("active");
-    }
-
-    function nextSlide() {
-      if (currentSlide < slidesData.length - 1) {
-        currentSlide++;
-        showSlide(currentSlide);
-      }
-    }
-
-    function prevSlide() {
-      if (currentSlide > 0) {
-        currentSlide--;
-        showSlide(currentSlide);
-      }
-    }
+    window.addEventListener('message', event => {
+      document.getElementById('texto').innerText = event.data;
+    });
   </script>
 </body>
 </html>
