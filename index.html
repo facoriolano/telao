@@ -5,52 +5,106 @@
   <title>Modo Diretor - Telão Interativo</title>
   <style>
     body {
-      background-color: #1c1c1c;
-      color: white;
-      font-family: sans-serif;
+      background: linear-gradient(135deg, #141026, #1c1c1c);
+      color: #eaeaea;
+      font-family: "Segoe UI", "Roboto", sans-serif;
+      margin: 0;
+      padding: 20px;
     }
-    .miniatura {
-      border: 1px solid #555;
-      padding: 6px;
-      margin: 4px;
-      cursor: pointer;
-      border-radius: 6px;
-      background: #2a2a2a;
-      color: #f1f1f1;
-      max-width: 300px;
-      min-width: 220px;
-      word-wrap: break-word;
-      white-space: pre-line;
+
+    header {
+      margin-bottom: 15px;
+    }
+
+    header h1 {
+      color: #ff8c00;
+      text-shadow: 0 0 8px #ff8c00;
+      margin: 0 0 10px 0;
+    }
+
+    input[type="file"], button {
+      margin: 6px 4px;
+      padding: 8px 14px;
+      border-radius: 10px;
+      border: none;
       font-size: 1em;
-      display: block;
+      cursor: pointer;
     }
-    .miniatura:hover {
-      background-color: #444;
+
+    input[type="file"] {
+      background: #2b2b2b;
+      color: #ddd;
     }
-    .miniatura.atual {
-      background-color: orange;
-      font-weight: bold;
+
+    button {
+      background: #6a00ff;
       color: white;
+      box-shadow: 0 0 10px rgba(106, 0, 255, 0.6);
+      transition: background 0.2s, transform 0.2s;
     }
-    #miniaturas {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
+    button:hover {
+      background: #8a2be2;
+      transform: scale(1.05);
     }
-    .botoes button {
-      margin: 0 4px;
-      padding: 8px 12px;
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+      box-shadow: none;
     }
+
+    #trechoAtualContainer {
+      margin-bottom: 20px;
+    }
+
     #trechoAtual {
       font-size: 1.4em;
-      background: #333;
-      padding: 10px;
-      border-radius: 6px;
-      margin-bottom: 10px;
+      background: #222;
+      padding: 12px;
+      border-radius: 10px;
+      margin-bottom: 12px;
       white-space: pre-line;
       word-break: break-word;
       min-height: 7.5em;
       line-height: 1.5em;
+      box-shadow: 0 0 10px rgba(255, 140, 0, 0.4);
+    }
+
+    .botoes button {
+      margin: 0 6px;
+      padding: 10px 16px;
+    }
+
+    #miniaturas {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .miniatura {
+      border: 1px solid #333;
+      padding: 10px;
+      margin: 6px;
+      cursor: pointer;
+      border-radius: 12px;
+      background: #222;
+      color: #ddd;
+      max-width: 280px;
+      min-width: 200px;
+      white-space: pre-line;
+      font-size: 0.95em;
+      display: block;
+      box-shadow: 0 0 6px rgba(255, 140, 0, 0.3);
+      transition: transform 0.2s, background 0.2s;
+    }
+    .miniatura:hover {
+      background-color: #2f2f2f;
+      transform: scale(1.02);
+    }
+    .miniatura.atual {
+      background: #ff8c00;
+      font-weight: bold;
+      color: white;
+      box-shadow: 0 0 12px #ff8c00;
     }
   </style>
 </head>
@@ -63,7 +117,7 @@
     </header>
 
     <section id="trechoAtualContainer">
-      <h2>Trecho Atual (5 linhas por slide)</h2>
+      <h2>Trecho Atual</h2>
       <div id="trechoAtual">Carregue o arquivo .txt</div>
       <div class="botoes">
         <button id="voltarBtn">⬅️ Voltar</button>
@@ -80,7 +134,6 @@
   <script>
     let trechos = [];
     let currentGroupIndex = 0;
-    const groupSize = 5;
     let popupWindow = null;
     let avancadoPorVoz = false;
 
@@ -91,13 +144,32 @@
     const avancarBtn = document.getElementById("avancarBtn");
     const voltarBtn = document.getElementById("voltarBtn");
 
+    // Função que divide o texto em slides equilibrados
+    function dividirEmSlides(texto) {
+      const linhas = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+      let slides = [];
+      let buffer = "";
+
+      linhas.forEach(linha => {
+        if ((buffer + " " + linha).length > 350) {
+          slides.push(buffer.trim());
+          buffer = linha;
+        } else {
+          buffer += (buffer ? " " : "") + linha;
+        }
+      });
+
+      if (buffer.trim().length > 0) slides.push(buffer.trim());
+      return slides;
+    }
+
     fileInput.addEventListener("change", function (event) {
       const file = event.target.files[0];
       const reader = new FileReader();
 
       reader.onload = function (e) {
         const texto = e.target.result;
-        trechos = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+        trechos = dividirEmSlides(texto);
         abrirPopUpBtn.disabled = false;
         currentGroupIndex = 0;
         avancadoPorVoz = false;
@@ -145,13 +217,11 @@
     };
 
     function getCurrentGroup() {
-      const start = currentGroupIndex * groupSize;
-      return trechos.slice(start, start + groupSize);
+      return trechos[currentGroupIndex] || "";
     }
 
     function atualizarTela() {
-      const grupo = getCurrentGroup();
-      trechoAtual.innerText = grupo.join('\n') || "";
+      trechoAtual.innerText = getCurrentGroup();
       atualizarTelao();
       atualizarMiniaturas();
     }
@@ -159,14 +229,13 @@
     function atualizarTelao() {
       if (popupWindow && !popupWindow.closed) {
         const p = popupWindow.document.getElementById("texto");
-        const grupo = getCurrentGroup();
-        p.innerText = grupo.join('\n') || "";
+        p.innerText = getCurrentGroup();
       }
     }
 
     function atualizarMiniaturas() {
       miniaturas.innerHTML = "";
-      const totalGroups = Math.ceil(trechos.length / groupSize);
+      const totalGroups = trechos.length;
       let atualDiv = null;
       for (let i = 0; i < totalGroups; i++) {
         const div = document.createElement("div");
@@ -175,9 +244,8 @@
           div.classList.add("atual");
           atualDiv = div;
         }
-        // Miniatura mostra o texto completo do grupo (todas as 5 linhas)
-        div.innerText = trechos.slice(i * groupSize, i * groupSize + groupSize).join('\n');
-        div.title = div.innerText;
+        div.innerText = trechos[i];
+        div.title = trechos[i];
         div.onclick = () => {
           currentGroupIndex = i;
           avancadoPorVoz = false;
@@ -185,13 +253,11 @@
         };
         miniaturas.appendChild(div);
       }
-      // Só rola se o slide atual não estiver visível
       if (atualDiv && !isElementInViewport(atualDiv)) {
         atualDiv.scrollIntoView({block: "nearest", behavior: "smooth"});
       }
     }
 
-    // Verifica se o elemento está visível na tela
     function isElementInViewport(el) {
       const rect = el.getBoundingClientRect();
       return (
@@ -201,8 +267,7 @@
     }
 
     function avancar() {
-      const totalGroups = Math.ceil(trechos.length / groupSize);
-      if (currentGroupIndex < totalGroups - 1) {
+      if (currentGroupIndex < trechos.length - 1) {
         currentGroupIndex++;
         avancadoPorVoz = false;
         atualizarTela();
@@ -243,14 +308,13 @@
 
       recognition.onresult = function (event) {
         const falado = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
-        // Buscar correspondência nos 10 grupos antes e depois (em trechos)
-        const totalGroups = Math.ceil(trechos.length / groupSize);
+
         let encontrado = -1;
         const startGroup = Math.max(0, currentGroupIndex - 10);
-        const endGroup = Math.min(totalGroups - 1, currentGroupIndex + 10);
+        const endGroup = Math.min(trechos.length - 1, currentGroupIndex + 10);
 
         for (let i = startGroup; i <= endGroup; i++) {
-          const grupo = trechos.slice(i * groupSize, i * groupSize + groupSize).join(' ').toLowerCase();
+          const grupo = trechos[i].toLowerCase();
           if (falado.includes(grupo.slice(0, 15))) {
             encontrado = i;
             break;
@@ -264,25 +328,21 @@
           return;
         }
 
-        // Avançar se pelo menos 70% do texto do grupo foi reconhecido
         if (!avancadoPorVoz) {
-          const grupoAtual = getCurrentGroup();
-          if (grupoAtual.length > 0) {
-            const textoGrupo = grupoAtual.join(' ').toLowerCase().replace(/[^\w\s]/gi, '');
-            const faladoLimpo = falado.replace(/[^\w\s]/gi, '');
-            const palavrasTexto = textoGrupo.split(/\s+/).filter(Boolean);
-            const palavrasFaladas = faladoLimpo.split(/\s+/).filter(Boolean);
+          const grupoAtual = getCurrentGroup().toLowerCase().replace(/[^\w\s]/gi, '');
+          const faladoLimpo = falado.replace(/[^\w\s]/gi, '');
+          const palavrasTexto = grupoAtual.split(/\s+/).filter(Boolean);
+          const palavrasFaladas = faladoLimpo.split(/\s+/).filter(Boolean);
 
-            let acertos = 0;
-            palavrasTexto.forEach(palavra => {
-              if (palavrasFaladas.includes(palavra)) acertos++;
-            });
+          let acertos = 0;
+          palavrasTexto.forEach(palavra => {
+            if (palavrasFaladas.includes(palavra)) acertos++;
+          });
 
-            const percentual = acertos / palavrasTexto.length;
-            if (percentual >= 0.7) {
-              avancadoPorVoz = true;
-              avancar();
-            }
+          const percentual = acertos / palavrasTexto.length;
+          if (percentual >= 0.7) {
+            avancadoPorVoz = true;
+            avancar();
           }
         }
       };
