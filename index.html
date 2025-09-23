@@ -1,70 +1,363 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <title>Telão</title>
+  <meta charset="UTF-8" />
+  <title>Modo Diretor - Telão Interativo</title>
   <style>
     body {
+      background: linear-gradient(135deg, #141026, #1c1c1c);
+      color: #eaeaea;
+      font-family: "Segoe UI", "Roboto", sans-serif;
       margin: 0;
-      background: black;
-      color: white;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      font-family: "Georgia", serif;
-      text-align: center;
-      padding: 40px;
+      padding: 20px;
     }
-    #texto {
-      font-size: 3.5vw; /* fonte maior */
-      line-height: 1.3;
-      max-width: 90%;
+
+    header {
+      margin-bottom: 15px;
+    }
+
+    header h1 {
+      color: #ff8c00;
+      text-shadow: 0 0 8px #ff8c00;
+      margin: 0 0 10px 0;
+    }
+
+    input[type="file"], button {
+      margin: 6px 4px;
+      padding: 8px 14px;
+      border-radius: 10px;
+      border: none;
+      font-size: 1em;
+      cursor: pointer;
+    }
+
+    input[type="file"] {
+      background: #2b2b2b;
+      color: #ddd;
+    }
+
+    button {
+      background: #6a00ff;
+      color: white;
+      box-shadow: 0 0 10px rgba(106, 0, 255, 0.6);
+      transition: background 0.2s, transform 0.2s;
+    }
+    button:hover {
+      background: #8a2be2;
+      transform: scale(1.05);
+    }
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    #trechoAtualContainer {
+      margin-bottom: 20px;
+    }
+
+    #trechoAtual {
+      font-size: 1.4em;
+      background: #222;
+      padding: 12px;
+      border-radius: 10px;
+      margin-bottom: 12px;
       white-space: pre-line;
+      word-break: break-word;
+      min-height: 7.5em;
+      line-height: 1.5em;
+      box-shadow: 0 0 10px rgba(255, 140, 0, 0.4);
+    }
+
+    .botoes button {
+      margin: 0 6px;
+      padding: 10px 16px;
+    }
+
+    #miniaturas {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .miniatura {
+      border: 1px solid #333;
+      padding: 10px;
+      margin: 6px;
+      cursor: pointer;
+      border-radius: 12px;
+      background: #222;
+      color: #ddd;
+      max-width: 280px;
+      min-width: 200px;
+      white-space: pre-line;
+      font-size: 0.95em;
+      display: block;
+      box-shadow: 0 0 6px rgba(255, 140, 0, 0.3);
+      transition: transform 0.2s, background 0.2s;
+    }
+    .miniatura:hover {
+      background-color: #2f2f2f;
+      transform: scale(1.02);
+    }
+    .miniatura.atual {
+      background: #ff8c00;
+      font-weight: bold;
+      color: white;
+      box-shadow: 0 0 12px #ff8c00;
     }
   </style>
 </head>
 <body>
-  <div id="texto">Aguardando texto...</div>
+  <div id="painel">
+    <header>
+      <h1>Modo Diretor</h1>
+      <input type="file" id="fileInput" accept=".txt" />
+      <button id="abrirPopUp" disabled>Abrir Telão</button>
+    </header>
+
+    <section id="trechoAtualContainer">
+      <h2>Trecho Atual</h2>
+      <div id="trechoAtual">Carregue o arquivo .txt</div>
+      <div class="botoes">
+        <button id="voltarBtn">⬅️ Voltar</button>
+        <button id="avancarBtn">➡️ Avançar</button>
+      </div>
+    </section>
+
+    <section id="proximosContainer">
+      <h2>Contexto (Todos os Slides)</h2>
+      <div id="miniaturas"></div>
+    </section>
+  </div>
 
   <script>
-    const channel = new BroadcastChannel("diretor");
-    const textoDiv = document.getElementById("texto");
+    let trechos = [];
+    let currentGroupIndex = 0;
+    let popupWindow = null;
+    let avancadoPorVoz = false;
 
-    // Função para dividir texto em blocos de até 5 linhas
-    function formatarTexto(texto) {
-      const palavras = texto.split(" ");
-      let linhas = [];
-      let linhaAtual = "";
+    const fileInput = document.getElementById("fileInput");
+    const abrirPopUpBtn = document.getElementById("abrirPopUp");
+    const trechoAtual = document.getElementById("trechoAtual");
+    const miniaturas = document.getElementById("miniaturas");
+    const avancarBtn = document.getElementById("avancarBtn");
+    const voltarBtn = document.getElementById("voltarBtn");
 
-      palavras.forEach(p => {
-        const teste = linhaAtual + " " + p;
-        // cria um span temporário para medir a largura
-        const span = document.createElement("span");
-        span.style.visibility = "hidden";
-        span.style.position = "absolute";
-        span.style.fontSize = getComputedStyle(textoDiv).fontSize;
-        span.innerText = teste.trim();
-        document.body.appendChild(span);
-        
-        if (span.offsetWidth > textoDiv.offsetWidth * 0.9) {
-          linhas.push(linhaAtual.trim());
-          linhaAtual = p;
-        } else {
-          linhaAtual = teste;
-        }
-        span.remove();
-      });
-      if (linhaAtual) linhas.push(linhaAtual.trim());
+    // Função que divide o texto em slides equilibrados
+    function dividirEmSlides(texto) {
+  const linhas = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+  let slides = [];
+  let buffer = "";
+  let linhasBuffer = 0;
 
-      // Junta no máximo 5 linhas
-      return linhas.slice(0, 5).join("\n");
+  linhas.forEach(linha => {
+    // Fecha o slide se passar de 350 caracteres OU 5 linhas
+    if ((buffer + " " + linha).length > 350 || linhasBuffer >= 5) {
+      slides.push(buffer.trim());
+      buffer = linha;
+      linhasBuffer = 1;
+    } else {
+      buffer += (buffer ? "\n" : "") + linha;
+      linhasBuffer++;
+    }
+  });
+
+  if (buffer.trim().length > 0) slides.push(buffer.trim());
+  return slides;
+}
+
+
+    fileInput.addEventListener("change", function (event) {
+      const file = event.target.files[0];
+      const reader = new FileReader();
+
+      reader.onload = function (e) {
+        const texto = e.target.result;
+        trechos = dividirEmSlides(texto);
+        abrirPopUpBtn.disabled = false;
+        currentGroupIndex = 0;
+        avancadoPorVoz = false;
+        atualizarTela();
+        startReconhecimento();
+      };
+
+      reader.readAsText(file);
+    });
+
+    abrirPopUpBtn.onclick = () => {
+      popupWindow = window.open("", "Telão", "width=800,height=600");
+      const doc = popupWindow.document;
+      doc.head.innerHTML = `
+        <title>Telão</title>
+        <style>
+          body {
+            margin: 0;
+            background: black;
+            color: white;
+            font-size: 2.5em;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            word-break: break-word;
+            white-space: pre-line;
+            overflow-wrap: break-word;
+            height: 100vh;
+            box-sizing: border-box;
+            line-height: 1.5em;
+          }
+          #texto {
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            white-space: pre-line;
+          }
+        </style>
+      `;
+      doc.body.innerHTML = `<p id="texto"></p>`;
+      atualizarTelao();
+    };
+
+    function getCurrentGroup() {
+      return trechos[currentGroupIndex] || "";
     }
 
-    channel.onmessage = (e) => {
-      const textoFormatado = formatarTexto(e.data);
-      textoDiv.innerText = textoFormatado;
-    };
+    function atualizarTela() {
+      trechoAtual.innerText = getCurrentGroup();
+      atualizarTelao();
+      atualizarMiniaturas();
+    }
+
+    function atualizarTelao() {
+      if (popupWindow && !popupWindow.closed) {
+        const p = popupWindow.document.getElementById("texto");
+        p.innerText = getCurrentGroup();
+      }
+    }
+
+    function atualizarMiniaturas() {
+      miniaturas.innerHTML = "";
+      const totalGroups = trechos.length;
+      let atualDiv = null;
+      for (let i = 0; i < totalGroups; i++) {
+        const div = document.createElement("div");
+        div.className = "miniatura";
+        if (i === currentGroupIndex) {
+          div.classList.add("atual");
+          atualDiv = div;
+        }
+        div.innerText = trechos[i];
+        div.title = trechos[i];
+        div.onclick = () => {
+          currentGroupIndex = i;
+          avancadoPorVoz = false;
+          atualizarTela();
+        };
+        miniaturas.appendChild(div);
+      }
+      if (atualDiv && !isElementInViewport(atualDiv)) {
+        atualDiv.scrollIntoView({block: "nearest", behavior: "smooth"});
+      }
+    }
+
+    function isElementInViewport(el) {
+      const rect = el.getBoundingClientRect();
+      return (
+        rect.top >= 0 &&
+        rect.bottom <= (window.innerHeight || document.documentElement.clientHeight)
+      );
+    }
+
+    function avancar() {
+      if (currentGroupIndex < trechos.length - 1) {
+        currentGroupIndex++;
+        avancadoPorVoz = false;
+        atualizarTela();
+      }
+    }
+
+    function voltar() {
+      if (currentGroupIndex > 0) {
+        currentGroupIndex--;
+        avancadoPorVoz = false;
+        atualizarTela();
+      }
+    }
+
+    avancarBtn.onclick = avancar;
+    voltarBtn.onclick = voltar;
+
+    document.addEventListener("keydown", (e) => {
+      const tecla = e.key.toLowerCase();
+      if (tecla === "arrowright" || tecla === "d") avancar();
+      if (tecla === "arrowleft" || tecla === "a") voltar();
+      if (tecla === "f" && popupWindow && !popupWindow.closed) {
+        popupWindow.document.documentElement.requestFullscreen();
+      }
+    });
+
+    function startReconhecimento() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert("Reconhecimento de voz não suportado.");
+        return;
+      }
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = "pt-BR";
+      recognition.continuous = true;
+      recognition.interimResults = false;
+
+      recognition.onresult = function (event) {
+        const falado = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+
+        let encontrado = -1;
+        const startGroup = Math.max(0, currentGroupIndex - 10);
+        const endGroup = Math.min(trechos.length - 1, currentGroupIndex + 10);
+
+        for (let i = startGroup; i <= endGroup; i++) {
+          const grupo = trechos[i].toLowerCase();
+          if (falado.includes(grupo.slice(0, 15))) {
+            encontrado = i;
+            break;
+          }
+        }
+
+        if (encontrado >= 0 && encontrado !== currentGroupIndex) {
+          currentGroupIndex = encontrado;
+          avancadoPorVoz = false;
+          atualizarTela();
+          return;
+        }
+
+        if (!avancadoPorVoz) {
+          const grupoAtual = getCurrentGroup().toLowerCase().replace(/[^\w\s]/gi, '');
+          const faladoLimpo = falado.replace(/[^\w\s]/gi, '');
+          const palavrasTexto = grupoAtual.split(/\s+/).filter(Boolean);
+          const palavrasFaladas = faladoLimpo.split(/\s+/).filter(Boolean);
+
+          let acertos = 0;
+          palavrasTexto.forEach(palavra => {
+            if (palavrasFaladas.includes(palavra)) acertos++;
+          });
+
+          const percentual = acertos / palavrasTexto.length;
+          if (percentual >= 0.7) {
+            avancadoPorVoz = true;
+            avancar();
+          }
+        }
+      };
+
+      recognition.onerror = function (event) {
+        console.error("Erro no reconhecimento:", event.error);
+      };
+
+      recognition.start();
+    }
   </script>
 </body>
 </html>
