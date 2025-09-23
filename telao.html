@@ -1,31 +1,70 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Telão</title>
   <style>
     body {
+      margin: 0;
       background: black;
       color: white;
-      font-size: 48px;
-      font-family: sans-serif;
       display: flex;
-      align-items: center;
       justify-content: center;
-      text-align: center;
+      align-items: center;
       height: 100vh;
-      margin: 0;
+      font-family: "Georgia", serif;
+      text-align: center;
       padding: 40px;
+    }
+    #texto {
+      font-size: 3.5vw; /* fonte maior */
+      line-height: 1.3;
+      max-width: 90%;
+      white-space: pre-line;
     }
   </style>
 </head>
 <body>
-  <div id="texto"></div>
+  <div id="texto">Aguardando texto...</div>
 
   <script>
-    window.addEventListener('message', event => {
-      document.getElementById('texto').innerText = event.data;
-    });
+    const channel = new BroadcastChannel("diretor");
+    const textoDiv = document.getElementById("texto");
+
+    // Função para dividir texto em blocos de até 5 linhas
+    function formatarTexto(texto) {
+      const palavras = texto.split(" ");
+      let linhas = [];
+      let linhaAtual = "";
+
+      palavras.forEach(p => {
+        const teste = linhaAtual + " " + p;
+        // cria um span temporário para medir a largura
+        const span = document.createElement("span");
+        span.style.visibility = "hidden";
+        span.style.position = "absolute";
+        span.style.fontSize = getComputedStyle(textoDiv).fontSize;
+        span.innerText = teste.trim();
+        document.body.appendChild(span);
+        
+        if (span.offsetWidth > textoDiv.offsetWidth * 0.9) {
+          linhas.push(linhaAtual.trim());
+          linhaAtual = p;
+        } else {
+          linhaAtual = teste;
+        }
+        span.remove();
+      });
+      if (linhaAtual) linhas.push(linhaAtual.trim());
+
+      // Junta no máximo 5 linhas
+      return linhas.slice(0, 5).join("\n");
+    }
+
+    channel.onmessage = (e) => {
+      const textoFormatado = formatarTexto(e.data);
+      textoDiv.innerText = textoFormatado;
+    };
   </script>
 </body>
 </html>
