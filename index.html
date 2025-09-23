@@ -146,22 +146,27 @@
 
     // Função que divide o texto em slides equilibrados
     function dividirEmSlides(texto) {
-      const linhas = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-      let slides = [];
-      let buffer = "";
+  const linhas = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+  let slides = [];
+  let buffer = "";
+  let linhasBuffer = 0;
 
-      linhas.forEach(linha => {
-        if ((buffer + " " + linha).length > 350) {
-          slides.push(buffer.trim());
-          buffer = linha;
-        } else {
-          buffer += (buffer ? " " : "") + linha;
-        }
-      });
-
-      if (buffer.trim().length > 0) slides.push(buffer.trim());
-      return slides;
+  linhas.forEach(linha => {
+    // Fecha o slide se passar de 350 caracteres OU 5 linhas
+    if ((buffer + " " + linha).length > 350 || linhasBuffer >= 5) {
+      slides.push(buffer.trim());
+      buffer = linha;
+      linhasBuffer = 1;
+    } else {
+      buffer += (buffer ? "\n" : "") + linha;
+      linhasBuffer++;
     }
+  });
+
+  if (buffer.trim().length > 0) slides.push(buffer.trim());
+  return slides;
+}
+
 
     fileInput.addEventListener("change", function (event) {
       const file = event.target.files[0];
