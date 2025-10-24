@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Modo Diretor - Telão Interativo</title>
+  <style>
+    body { background-color: #1c1c1c; color: white; font-family: sans-serif; }
+    .miniatura {
+      border: 1px solid #555; padding: 6px; margin: 4px; cursor: pointer;
+      border-radius: 6px; background: #2a2a2a; color: #f1f1f1;
+      max-width: 300px; min-width: 220px; word-wrap: break-word;
+      white-space: pre-line; font-size: 1em; display: block;
+    }
+    .miniatura:hover { background-color: #444; }
+    .miniatura.atual { background-color: orange; font-weight: bold; color: white; }
+    #miniaturas { display: flex; flex-wrap: wrap; gap: 4px; }
+    .botoes button { margin: 0 4px; padding: 8px 12px; }
+    #trechoAtual {
+      font-size: 1.4em; background: #333; padding: 10px; border-radius: 6px;
+      margin-bottom: 10px; white-space: pre-line; word-break: break-word;
+      min-height: 7.5em; line-height: 1.5em;
+    }
+    #voiceIndicator {
+      margin-top: 10px; padding: 8px 12px; background: #555; border-radius: 5px;
+      font-size: 12px; display: inline-block;
+    }
+    #voiceIndicator.listening { background: #ff9800; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.7;} }
+  </style>
+</head>
+<body>
+  <div id="painel">
+    <header>
+      <h1>Modo Diretor</h1>
+      <input type="file" id="fileInput" accept=".txt" />
+      <button id="abrirPopUp" disabled>Abrir Telão</button>
+      <button id="voiceBtn" data-active="false">🎤 Iniciar Voz</button>
+      <span id="voiceIndicator">Pronto</span>
+    </header>
+
+    <section id="trechoAtualContainer">
+      <h2>Trecho Atual (5 linhas por slide)</h2>
+      <div id="trechoAtual">Carregue o arquivo .txt</div>
+      <div class="botoes">
+        <button id="voltarBtn">⬅️ Voltar</button>
+        <button id="avancarBtn">➡️ Avançar</button>
+      </div>
+    </section>
+
+    <section id="proximosContainer">
+      <h2>Contexto (Todos os Slides)</h2>
+      <div id="miniaturas"></div>
+    </section>
+  </div>
+
+  <script>
+    let trechos = [];
+    let currentGroupIndex = 0;
+    const groupSize = 5;
+    let popupWindow = null;
+    let recognition = null;
+
+    const fileInput = document.getElementById("fileInput");
+    const abrirPopUpBtn = document.getElementById("abrirPopUp");
+    const trechoAtual = document.getElementById("trechoAtual");
+    const miniaturas = document.getElementById("miniaturas");
+    const avancarBtn = document.getElementById("avancarBtn");
+    const voltarBtn = document.getElementById("voltarBtn");
+    const voiceBtn = document.getElementById("voiceBtn");
+    const voiceIndicator = document.getElementById("voiceIndicator");
+
+    // === Carregar TXT ===
+    fileInput.addEventListener("change", function (event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const textoLimpo = e.target.result.replace(/\r\n/g, "\n");
+        trechos = textoLimpo.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+        abrirPopUpBtn.disabled = false;
+        currentGroupIndex = 0;
+        atualizarTela();
+        initVoiceRecognition();
+        console.log('✓ Arquivo carregado: ' + trechos.length + ' linhas');
+      };
+      reader.onerror = () => alert("Erro ao ler arquivo TXT");
+      reader.readAsText(file, "UTF-8");
+    });
+
+    // === Abrir Telão ===
+    abrirPopUpBtn.onclick = () => {
+      popupWindow = window.open("", "Telão", "width=800,height=600");
+      if (!popupWindow) {
+        alert("Pop-up bloqueado. Permita abrir janelas para usar o Telão.");
+        return;
+      }
+      const doc = popupWindow.document;
+      doc.head.innerHTML = `
+        <title>Telão</title>
+        <style>
+          body { margin:0; background:black; color:white; font-size:2.5em;
+                 display:flex; justify-content:center; align-items:center;
+                 text-align:center; padding:20px; white-space:pre-line; height:100vh; }
+          #texto { max-width:90vw; max-height:90vh; }
+        </style>`;
+      doc.body.innerHTML = `<p id="texto"></p>`;
+      atualizarTelao();
+    };
+
+    function getCurrentGroup() {
+      const start = currentGroupIndex * groupSize;
+      return trechos.slice(start, start + groupSize);
+    }
+
+    function atualizarTela() {
+      const grupo = getCurrentGroup();
+      trechoAtual.innerText = grupo.join('\n') || "";
+      atualizarTelao();
+      atualizarMiniaturas();
+    }
+
+    function atualizarTelao() {
+      if (popupWindow && !popupWindow.closed) {
+        const p = popupWindow.document.getElementById("texto");
+        if (p) p.innerText = getCurrentGroup().join('\n') || "";
+      }
+    }
+
+    function atualizarMiniaturas() {
+      miniaturas.innerHTML = "";
+      const totalGroups = Math.ceil(trechos.length / groupSize);
+      for (let i = 0; i < totalGroups; i++) {
+        const div = document.createElement("div");
+        div.className = "miniatura";
+        if (i === currentGroupIndex) div.classList.add("atual");
+        div.innerText = trechos.slice(i * groupSize, i * groupSize + groupSize).join('\n');
+        div.onclick = () => { currentGroupIndex = i; atualizarTela(); };
+        miniaturas.appendChild(div);
+      }
+    }
+
+    function avancar() {
+      const totalGroups = Math.ceil(trechos.length / groupSize);
+      if (currentGroupIndex < totalGroups - 1) { currentGroupIndex++; atualizarTela(); }
+    }
+    function voltar() {
+      if (currentGroupIndex > 0) { currentGroupIndex--; atualizarTela(); }
+    }
+    avancarBtn.onclick = avancar;
+    voltarBtn.onclick = voltar;
+
+    // === Reconhecimento de Voz ===
+    function initVoiceRecognition() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        voiceIndicator.textContent = "Voz não suportada";
+        voiceBtn.disabled = true;
+        return;
+      }
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "pt-BR";
+
+      recognition.onstart = () => {
+        voiceIndicator.textContent = "Escutando...";
+        voiceIndicator.classList.add("listening");
+      };
+
+      recognition.onresult = (event) => {
+        let transcript = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript + " ";
+        }
+        transcript = transcript.toLowerCase().trim();
+        voiceIndicator.textContent = "Ouvindo: " + transcript;
+        // Processar mesmo antes de ser final para resposta mais rápida
+        if (event.results[event.results.length - 1].isFinal) {
+          processVoiceCommand(transcript);
+        } else if (transcript.length > 3) {
+          // Verificar também em resultados intermediários para resposta mais rápida
+          // Mas apenas se tiver pelo menos 4 palavras
+          const words = transcript.trim().split(/\s+/).length;
+          if (words >= 4) {
+            processVoiceCommandFast(transcript);
+          }
+        }
+      };
+
+      recognition.onerror = (e) => {
+        voiceIndicator.textContent = "Erro: " + e.error;
+      };
+
+      recognition.onend = () => {
+        voiceIndicator.classList.remove("listening");
+        if (voiceBtn.dataset.active === "true") {
+          setTimeout(() => recognition.start(), 50);
+        }
+      };
+    }
+
+    // === Processar Comando de Voz (Rápido) ===
+    function processVoiceCommandFast(transcript) {
+      if (trechos.length === 0) return;
+      
+      const grupoAtual = getCurrentGroup();
+      const textoAtual = grupoAtual.join(' ').toLowerCase();
+      const ultimasPalavras = getLastNWords(textoAtual, 4);
+      
+      if (ultimasPalavras && matchWordsStrict(transcript, ultimasPalavras)) {
+        console.log('✓ Avançando RÁPIDO por últimas 4 palavras');
+        voiceIndicator.textContent = '✓ Avançando... (' + ultimasPalavras + ')';
+        recognition.stop();
+        avancar();
+        return;
+      }
+      
+      const totalGroups = Math.ceil(trechos.length / groupSize);
+      if (currentGroupIndex < totalGroups - 1) {
+        const proximoGrupo = trechos.slice((currentGroupIndex + 1) * groupSize, (currentGroupIndex + 1) * groupSize + groupSize);
+        const textoProximo = proximoGrupo.join(' ').toLowerCase();
+        const primeirasProximas = getFirstNWords(textoProximo, 4);
+        
+        if (primeirasProximas && matchWordsStrict(transcript, primeirasProximas)) {
+          console.log('✓ Avançando RÁPIDO por primeiras 4 do próximo');
+          voiceIndicator.textContent = '✓ Avançando... (' + primeirasProximas + ')';
+          recognition.stop();
+          avancar();
+          return;
+        }
+      }
+    }
+
+    // === Processar Comando de Voz ===
+    function processVoiceCommand(transcript) {
+      if (trechos.length === 0) return;
+      
+      // Obter o grupo atual
+      const grupoAtual = getCurrentGroup();
+      const textoAtual = grupoAtual.join(' ').toLowerCase();
+      
+      // Obter as últimas 4 palavras do grupo atual
+      const ultimasPalavras = getLastNWords(textoAtual, 4);
+      console.log('Falado:', transcript);
+      console.log('Últimas 4 palavras:', ultimasPalavras);
+      
+      // Verificar se as últimas 4 palavras foram faladas
+      if (ultimasPalavras && matchWords(transcript, ultimasPalavras)) {
+        console.log('✓ Avançando por últimas 4 palavras');
+        voiceIndicator.textContent = '✓ Avançando... (' + ultimasPalavras + ')';
+        avancar();
+        return;
+      }
+      
+      // Verificar as primeiras 4 palavras do próximo grupo
+      const totalGroups = Math.ceil(trechos.length / groupSize);
+      if (currentGroupIndex < totalGroups - 1) {
+        const proximoGrupo = trechos.slice((currentGroupIndex + 1) * groupSize, (currentGroupIndex + 1) * groupSize + groupSize);
+        const textoProximo = proximoGrupo.join(' ').toLowerCase();
+        const primeirasProximas = getFirstNWords(textoProximo, 4);
+        console.log('Primeiras 4 do próximo:', primeirasProximas);
+        
+        if (primeirasProximas && matchWords(transcript, primeirasProximas)) {
+          console.log('✓ Avançando por primeiras 4 do próximo');
+          voiceIndicator.textContent = '✓ Avançando... (' + primeirasProximas + ')';
+          avancar();
+          return;
+        }
+      }
+    }
+    
+    function getLastNWords(text, n) {
+      const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+      return words.slice(-n).join(' ');
+    }
+    
+    function getFirstNWords(text, n) {
+      const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+      return words.slice(0, n).join(' ');
+    }
+    
+    function matchWords(transcript, target) {
+      // Remover pontuação
+      const cleanTranscript = transcript.replace(/[.,!?;:\-]/g, '').trim();
+      const cleanTarget = target.replace(/[.,!?;:\-]/g, '').trim();
+      
+      // Verificação exata
+      if (cleanTranscript.includes(cleanTarget)) {
+        return true;
+      }
+      
+      // Verificação parcial (pelo menos 3 das 4 palavras)
+      const tWords = cleanTranscript.split(/\s+/);
+      const targetWords = cleanTarget.split(/\s+/);
+      
+      let matches = 0;
+      for (let i = 0; i < targetWords.length; i++) {
+        for (let j = 0; j < tWords.length; j++) {
+          if (tWords[j].includes(targetWords[i]) || targetWords[i].includes(tWords[j])) {
+            matches++;
+            break;
+          }
+        }
+      }
+      
+      return matches >= 3;
+    }
+    
+    function matchWordsStrict(transcript, target) {
+      // Versao mais rigorosa para resultados intermediarios
+      // Requer 4 das 4 palavras ou correspondencia exata
+      const cleanTranscript = transcript.replace(/[.,!?;:\-]/g, '').trim();
+      const cleanTarget = target.replace(/[.,!?;:\-]/g, '').trim();
+      
+      // Verificacao exata
+      if (cleanTranscript.includes(cleanTarget)) {
+        return true;
+      }
+      
+      // Verificacao rigorosa (todas as 4 palavras)
+      const tWords = cleanTranscript.split(/\s+/);
+      const targetWords = cleanTarget.split(/\s+/);
+      
+      let matches = 0;
+      for (let i = 0; i < targetWords.length; i++) {
+        for (let j = 0; j < tWords.length; j++) {
+          if (tWords[j].includes(targetWords[i]) || targetWords[i].includes(tWords[j])) {
+            matches++;
+            break;
+          }
+        }
+      }
+      
+      // Requer todas as 4 palavras para resultados intermediarios
+      return matches === 4;
+    }
+
+    voiceBtn.onclick = () => {
+      if (!recognition) initVoiceRecognition();
+      if (voiceBtn.dataset.active === "true") {
+        recognition.stop();
+        voiceBtn.dataset.active = "false";
+        voiceBtn.textContent = "🎤 Iniciar Voz";
+        voiceIndicator.textContent = "Microfone desligado";
+      } else {
+        recognition.start();
+        voiceBtn.dataset.active = "true";
+        voiceBtn.textContent = "🎤 Parar Voz";
+        voiceIndicator.textContent = "Escutando...";
+      }
+    };
+
+    // Navegação por teclado
+    document.addEventListener('keydown', (e) => {
+      if (trechos.length === 0) return;
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); avancar(); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); voltar(); }
+    });
+
+    console.log('✓ Voice Presentation App iniciado');
+  </script>
+</body>
+</html>
+
