@@ -80,6 +80,8 @@
         abrirPopUpBtn.disabled = false;
         currentGroupIndex = 0;
         atualizarTela();
+        initVoiceRecognition();
+        console.log('✓ Arquivo carregado: ' + trechos.length + ' linhas');
       };
       reader.onerror = () => alert("Erro ao ler arquivo TXT");
       reader.readAsText(file, "UTF-8");
@@ -164,6 +166,7 @@
         voiceIndicator.textContent = "Escutando...";
         voiceIndicator.classList.add("listening");
       };
+
       recognition.onresult = (event) => {
         let transcript = "";
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -172,19 +175,95 @@
         transcript = transcript.toLowerCase().trim();
         voiceIndicator.textContent = "Ouvindo: " + transcript;
         if (event.results[event.results.length - 1].isFinal) {
-          if (transcript.includes("próximo") || transcript.includes("avançar")) avancar();
-          if (transcript.includes("voltar") || transcript.includes("anterior")) voltar();
+          processVoiceCommand(transcript);
         }
       };
+
       recognition.onerror = (e) => {
         voiceIndicator.textContent = "Erro: " + e.error;
       };
+
       recognition.onend = () => {
         voiceIndicator.classList.remove("listening");
         if (voiceBtn.dataset.active === "true") {
           setTimeout(() => recognition.start(), 200);
         }
       };
+    }
+
+    // === Processar Comando de Voz ===
+    function processVoiceCommand(transcript) {
+      if (trechos.length === 0) return;
+      
+      // Obter o grupo atual
+      const grupoAtual = getCurrentGroup();
+      const textoAtual = grupoAtual.join(' ').toLowerCase();
+      
+      // Obter as últimas 4 palavras do grupo atual
+      const ultimasPalavras = getLastNWords(textoAtual, 4);
+      console.log('Falado:', transcript);
+      console.log('Últimas 4 palavras:', ultimasPalavras);
+      
+      // Verificar se as últimas 4 palavras foram faladas
+      if (ultimasPalavras && matchWords(transcript, ultimasPalavras)) {
+        console.log('✓ Avançando por últimas 4 palavras');
+        voiceIndicator.textContent = '✓ Avançando... (' + ultimasPalavras + ')';
+        avancar();
+        return;
+      }
+      
+      // Verificar as primeiras 4 palavras do próximo grupo
+      const totalGroups = Math.ceil(trechos.length / groupSize);
+      if (currentGroupIndex < totalGroups - 1) {
+        const proximoGrupo = trechos.slice((currentGroupIndex + 1) * groupSize, (currentGroupIndex + 1) * groupSize + groupSize);
+        const textoProximo = proximoGrupo.join(' ').toLowerCase();
+        const primeirasProximas = getFirstNWords(textoProximo, 4);
+        console.log('Primeiras 4 do próximo:', primeirasProximas);
+        
+        if (primeirasProximas && matchWords(transcript, primeirasProximas)) {
+          console.log('✓ Avançando por primeiras 4 do próximo');
+          voiceIndicator.textContent = '✓ Avançando... (' + primeirasProximas + ')';
+          avancar();
+          return;
+        }
+      }
+    }
+    
+    function getLastNWords(text, n) {
+      const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+      return words.slice(-n).join(' ');
+    }
+    
+    function getFirstNWords(text, n) {
+      const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+      return words.slice(0, n).join(' ');
+    }
+    
+    function matchWords(transcript, target) {
+      // Remover pontuação
+      const cleanTranscript = transcript.replace(/[.,!?;:\-]/g, '').trim();
+      const cleanTarget = target.replace(/[.,!?;:\-]/g, '').trim();
+      
+      // Verificação exata
+      if (cleanTranscript.includes(cleanTarget)) {
+        return true;
+      }
+      
+      // Verificação parcial (pelo menos 3 das 4 palavras)
+      const tWords = cleanTranscript.split(/\s+/);
+      const targetWords = cleanTarget.split(/\s+/);
+      
+      let matches = 0;
+      for (let i = 0; i < targetWords.length; i++) {
+        for (let j = 0; j < tWords.length; j++) {
+          if (tWords[j].includes(targetWords[i]) || targetWords[i].includes(tWords[j])) {
+            matches++;
+            break;
+          }
+        }
+      }
+      
+      return matches >= 3;
     }
 
     voiceBtn.onclick = () => {
@@ -201,6 +280,15 @@
         voiceIndicator.textContent = "Escutando...";
       }
     };
+
+    // Navegação por teclado
+    document.addEventListener('keydown', (e) => {
+      if (trechos.length === 0) return;
+      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); avancar(); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); voltar(); }
+    });
+
+    console.log('✓ Voice Presentation App iniciado');
   </script>
 </body>
 </html>
