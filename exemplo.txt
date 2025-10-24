@@ -1,0 +1,60 @@
+Bem-vindo à Apresentação
+
+Esta é uma apresentação de exemplo para demonstrar como o aplicativo funciona com reconhecimento de voz.
+
+Slide Dois Aqui
+
+Este é o segundo slide da apresentação com um conteúdo bem interessante para você entender como funciona.
+
+Terceiro Slide Importante
+
+Agora estamos no terceiro slide e você pode ver como o texto se ajusta automaticamente para caber na tela.
+
+Quarto Slide Final
+
+Este é o último slide da apresentação de exemplo para você testar o reconhecimento de voz corretamente.
+
+Introdução ao Projeto
+
+O Voice Presentation App foi criado para eliminar a necessidade de uma pessoa ficar mudando slides durante apresentações.
+
+Objetivos Principais
+
+Queremos alcançar os seguintes objetivos principais com este projeto.
+
+Funcionalidades Oferecidas
+
+O aplicativo oferece múltiplas formas de navegação para sua comodidade.
+
+Reconhecimento de Voz
+
+A inteligência artificial reconhece as palavras que você fala durante a apresentação.
+
+Tela do Apresentador
+
+Você pode ver todos os slides em miniatura e o slide atual destacado em verde.
+
+Tela de Projeção
+
+A tela de projeção tem resolução fixa de oitocentos por seiscentos pixels.
+
+Navegação por Teclado
+
+Use as setas do teclado para navegar entre os slides facilmente.
+
+Navegação por Mouse
+
+Clique nos botões ou nos slides para mudar de slide rapidamente.
+
+Carregamento de Arquivo
+
+Carregue qualquer arquivo TXT para criar sua apresentação automaticamente.
+
+Ajuste Automático
+
+O texto é redimensionado automaticamente para caber na tela.
+
+Conclusão Final
+
+Obrigado pela atenção e aproveite o Voice Presentation App para suas apresentações.
+
