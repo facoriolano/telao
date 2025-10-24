@@ -193,4 +193,7 @@
         recognition.stop();
         voiceBtn.dataset.active = "false";
         voiceBtn.textContent = "🎤 Iniciar Voz";
-        voiceIndicator.textContent =
+        voiceIndicator.textContent = "Microfone desligado";
+      } else {
+        recognition.start();
+        voiceBtn.dataset
