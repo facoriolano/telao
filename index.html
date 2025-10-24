@@ -1,431 +1,186 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Voice Presentation App</title>
+  <meta charset="UTF-8" />
+  <title>Modo Diretor - Telão Interativo</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a1a; color: #fff; overflow: hidden; }
-
-    .app-container { display: flex; height: 100vh; width: 100%; }
-    .presenter-view { flex: 1; display: flex; flex-direction: column; padding: 20px; background: #2a2a2a; border-right: 2px solid #444; overflow-y: auto; min-width: 300px; }
-    .presenter-header { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #444; }
-    .presenter-title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
-    .presenter-info { font-size: 13px; color: #aaa; line-height: 1.5; }
-
-    .slides-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; flex: 1; overflow-y: auto; }
-    .slide-thumbnail {
-      position: relative; width: 100%; padding-top: 75%;
-      background: #1a1a1a; border: 3px solid #555; border-radius: 8px;
-      cursor: pointer; transition: all 0.3s ease; font-size: 10px; color: #aaa;
-      text-align: center; line-height: 1.3; display: flex; align-items: center; justify-content: center; overflow: hidden;
+    body { background-color: #1c1c1c; color: white; font-family: sans-serif; }
+    .miniatura {
+      border: 1px solid #555; padding: 6px; margin: 4px; cursor: pointer;
+      border-radius: 6px; background: #2a2a2a; color: #f1f1f1;
+      max-width: 300px; min-width: 220px; word-wrap: break-word;
+      white-space: pre-line; font-size: 1em; display: block;
     }
-    .slide-thumbnail:hover { border-color: #888; transform: scale(1.05); }
-    .slide-thumbnail.active { border-color: #4CAF50; background: #1a3a1a; box-shadow: 0 0 15px rgba(76,175,80,0.5); }
-    .slide-thumbnail.active::before { content: '▶'; position: absolute; font-size: 18px; color: #4CAF50; }
-    .slide-number { position: absolute; bottom: 5px; right: 5px; background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 3px; font-size: 9px; }
-
-    .controls { display: flex; gap: 8px; margin-top: 15px; flex-wrap: wrap; }
-    button, input[type="file"] {
-      padding: 10px 15px; background: #4CAF50; color: white; border: none; border-radius: 5px;
-      cursor: pointer; font-size: 13px; flex: 1; min-width: 100px; transition: all 0.3s ease;
+    .miniatura:hover { background-color: #444; }
+    .miniatura.atual { background-color: orange; font-weight: bold; color: white; }
+    #miniaturas { display: flex; flex-wrap: wrap; gap: 4px; }
+    .botoes button { margin: 0 4px; padding: 8px 12px; }
+    #trechoAtual {
+      font-size: 1.4em; background: #333; padding: 10px; border-radius: 6px;
+      margin-bottom: 10px; white-space: pre-line; word-break: break-word;
+      min-height: 7.5em; line-height: 1.5em;
     }
-    button:hover, input[type="file"]:hover { background: #45a049; }
-    button.telao-btn { background: #2196F3; }
-    button.telao-btn:hover { background: #1976D2; }
-
-    .voice-indicator { padding: 8px 12px; background: #555; border-radius: 5px; font-size: 12px; display: flex; align-items: center; gap: 8px; flex: 1; min-width: 150px; }
-    .voice-indicator.listening { background: #ff9800; animation: pulse 1s infinite; }
+    #voiceIndicator {
+      margin-top: 10px; padding: 8px 12px; background: #555; border-radius: 5px;
+      font-size: 12px; display: inline-block;
+    }
+    #voiceIndicator.listening { background: #ff9800; animation: pulse 1s infinite; }
     @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.7;} }
-
-    .stats { margin-top: 15px; padding: 10px; background: #1a1a1a; border-radius: 5px; font-size: 12px; color: #aaa; }
-    .stat-row { display: flex; justify-content: space-between; margin: 5px 0; }
-
-    .projection-view { flex: 0 0 800px; display: flex; flex-direction: column; background: #000; border-left: 2px solid #444; }
-    .projection-screen {
-      width: 800px; height: 600px; background: #000; display: flex; align-items: center; justify-content: center;
-      padding: 15px; font-size: 90px; text-align: center; line-height: 1.1; color: #fff; overflow: hidden; word-wrap: break-word; font-weight: 500;
-    }
-    .projection-info { background: #1a1a1a; padding: 12px; text-align: center; font-size: 11px; color: #aaa; border-top: 1px solid #444; display: flex; justify-content: space-around; }
-
-    @media (max-width: 1200px) {
-      .app-container { flex-direction: column; }
-      .presenter-view { border-right: none; border-bottom: 2px solid #444; max-height: 45vh; }
-      .projection-view { flex: 1; border-left: none; border-top: 2px solid #444; }
-      .projection-screen { width: 100%; height: 100%; }
-    }
   </style>
 </head>
 <body>
-  <div class="app-container">
-    <div class="presenter-view">
-      <div class="presenter-header">
-        <div class="presenter-title">🎤 Voice Presentation</div>
-        <div class="presenter-info">Clique nos slides, use as setas ← → ou fale as últimas 4 palavras</div>
+  <div id="painel">
+    <header>
+      <h1>Modo Diretor</h1>
+      <input type="file" id="fileInput" accept=".txt" />
+      <button id="abrirPopUp" disabled>Abrir Telão</button>
+      <button id="voiceBtn" data-active="false">🎤 Iniciar Voz</button>
+      <span id="voiceIndicator">Pronto</span>
+    </header>
+
+    <section id="trechoAtualContainer">
+      <h2>Trecho Atual (5 linhas por slide)</h2>
+      <div id="trechoAtual">Carregue o arquivo .txt</div>
+      <div class="botoes">
+        <button id="voltarBtn">⬅️ Voltar</button>
+        <button id="avancarBtn">➡️ Avançar</button>
       </div>
+    </section>
 
-      <div class="slides-grid" id="slidesGrid"></div>
-
-      <div class="controls">
-        <input type="file" id="fileInput" accept=".txt,text/plain" aria-label="Carregar arquivo de slides" />
-        <button id="prevBtn" aria-label="Slide anterior">← Anterior</button>
-        <button id="nextBtn" aria-label="Próximo slide">Próximo →</button>
-        <button id="voiceBtn" data-active="false" aria-label="Ativar reconhecimento de voz">🎤 Iniciar Voz</button>
-        <button id="telaoBtn" class="telao-btn" aria-label="Abrir telão">📺 Abrir Telão</button>
-      </div>
-
-      <div class="voice-indicator" id="voiceIndicator"><span id="voiceStatus">Pronto</span></div>
-
-      <div class="stats">
-        <div class="stat-row"><span>Slides:</span><span id="totalSlides">0</span></div>
-        <div class="stat-row"><span>Atual:</span><span id="currentSlideNum">0</span></div>
-        <div class="stat-row"><span>Voz:</span><span id="voiceStatus2">Desligada</span></div>
-      </div>
-    </div>
-
-    <div class="projection-view">
-      <div class="projection-screen" id="projectionScreen">Carregue um arquivo TXT para começar</div>
-      <div class="projection-info">
-        <div>Slide <span id="slideCounter">0/0</span></div>
-        <div><span id="voiceDebug">Pronto</span></div>
-      </div>
-    </div>
+    <section id="proximosContainer">
+      <h2>Contexto (Todos os Slides)</h2>
+      <div id="miniaturas"></div>
+    </section>
   </div>
 
   <script>
-    let slides = [];
-    let currentSlide = 0;
+    let trechos = [];
+    let currentGroupIndex = 0;
+    const groupSize = 5;
+    let popupWindow = null;
     let recognition = null;
-    let telaoWindow = null;
 
+    const fileInput = document.getElementById("fileInput");
+    const abrirPopUpBtn = document.getElementById("abrirPopUp");
+    const trechoAtual = document.getElementById("trechoAtual");
+    const miniaturas = document.getElementById("miniaturas");
+    const avancarBtn = document.getElementById("avancarBtn");
+    const voltarBtn = document.getElementById("voltarBtn");
+    const voiceBtn = document.getElementById("voiceBtn");
+    const voiceIndicator = document.getElementById("voiceIndicator");
+
+    fileInput.addEventListener("change", function (event) {
+      const file = event.target.files[0];
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const texto = e.target.result;
+        trechos = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+        abrirPopUpBtn.disabled = false;
+        currentGroupIndex = 0;
+        atualizarTela();
+      };
+      reader.readAsText(file, "UTF-8");
+    });
+
+    abrirPopUpBtn.onclick = () => {
+      popupWindow = window.open("", "Telão", "width=800,height=600");
+      const doc = popupWindow.document;
+      doc.head.innerHTML = `
+        <title>Telão</title>
+        <style>
+          body { margin:0; background:black; color:white; font-size:2.5em;
+                 display:flex; justify-content:center; align-items:center;
+                 text-align:center; padding:20px; white-space:pre-line; height:100vh; }
+          #texto { max-width:90vw; max-height:90vh; }
+        </style>`;
+      doc.body.innerHTML = `<p id="texto"></p>`;
+      atualizarTelao();
+    };
+
+    function getCurrentGroup() {
+      const start = currentGroupIndex * groupSize;
+      return trechos.slice(start, start + groupSize);
+    }
+
+    function atualizarTela() {
+      const grupo = getCurrentGroup();
+      trechoAtual.innerText = grupo.join('\n') || "";
+      atualizarTelao();
+      atualizarMiniaturas();
+    }
+
+    function atualizarTelao() {
+      if (popupWindow && !popupWindow.closed) {
+        const p = popupWindow.document.getElementById("texto");
+        if (p) p.innerText = getCurrentGroup().join('\n') || "";
+      }
+    }
+
+    function atualizarMiniaturas() {
+      miniaturas.innerHTML = "";
+      const totalGroups = Math.ceil(trechos.length / groupSize);
+      for (let i = 0; i < totalGroups; i++) {
+        const div = document.createElement("div");
+        div.className = "miniatura";
+        if (i === currentGroupIndex) div.classList.add("atual");
+        div.innerText = trechos.slice(i * groupSize, i * groupSize + groupSize).join('\n');
+        div.onclick = () => { currentGroupIndex = i; atualizarTela(); };
+        miniaturas.appendChild(div);
+      }
+    }
+
+    function avancar() {
+      const totalGroups = Math.ceil(trechos.length / groupSize);
+      if (currentGroupIndex < totalGroups - 1) { currentGroupIndex++; atualizarTela(); }
+    }
+    function voltar() {
+      if (currentGroupIndex > 0) { currentGroupIndex--; atualizarTela(); }
+    }
+    avancarBtn.onclick = avancar;
+    voltarBtn.onclick = voltar;
+
+    // ===== Reconhecimento de voz adaptado =====
     function initVoiceRecognition() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
-        console.warn('Web Speech API não suportada');
-        document.getElementById('voiceBtn').disabled = true;
-        return false;
+        voiceIndicator.textContent = "Voz não suportada";
+        voiceBtn.disabled = true;
+        return;
       }
       recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
-      recognition.lang = 'pt-BR';
+      recognition.lang = "pt-BR";
 
       recognition.onstart = () => {
-        updateVoiceStatus('Escutando...');
-        document.getElementById('voiceIndicator').classList.add('listening');
+        voiceIndicator.textContent = "Escutando...";
+        voiceIndicator.classList.add("listening");
       };
-
       recognition.onresult = (event) => {
-        let transcript = '';
+        let transcript = "";
         for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript + ' ';
+          transcript += event.results[i][0].transcript + " ";
         }
         transcript = transcript.toLowerCase().trim();
-        updateVoiceStatus('Ouvindo: ' + transcript);
+        voiceIndicator.textContent = "Ouvindo: " + transcript;
         if (event.results[event.results.length - 1].isFinal) {
-          processVoiceCommand(transcript);
+          // lógica simples: se falou "próximo" ou "avançar"
+          if (transcript.includes("próximo") || transcript.includes("avançar")) avancar();
+          if (transcript.includes("voltar") || transcript.includes("anterior")) voltar();
         }
       };
-
-      recognition.onerror = (event) => {
-        console.error('Erro:', event.error);
-        updateVoiceStatus('Erro: ' + event.error);
+      recognition.onerror = (e) => {
+        voiceIndicator.textContent = "Erro: " + e.error;
       };
-
       recognition.onend = () => {
-        document.getElementById('voiceIndicator').classList.remove('listening');
-        if (document.getElementById('voiceBtn').dataset.active === 'true') {
-          try {
-            setTimeout(() => recognition.start(), 150);
-          } catch (e) {
-            updateVoiceStatus('Falha ao reiniciar microfone');
-            document.getElementById('voiceBtn').dataset.active = 'false';
-            document.getElementById('voiceBtn').textContent = '🎤 Iniciar Voz';
-            updateStats();
-          }
+        voiceIndicator.classList.remove("listening");
+        if (voiceBtn.dataset.active === "true") {
+          setTimeout(() => recognition.start(), 200);
         }
       };
-      return true;
     }
 
-    function processVoiceCommand(transcript) {
-      if (slides.length === 0) return;
-      const currentText = slides[currentSlide].toLowerCase();
-      const lastFour = getLastNWords(currentText, 4);
-      let nextFirst = '';
-      if (currentSlide < slides.length - 1) {
-        nextFirst = getFirstNWords(slides[currentSlide + 1].toLowerCase(), 4);
-      }
-      if (lastFour && matchWords(transcript, lastFour)) { nextSlide(); return; }
-      if (nextFirst && matchWords(transcript, nextFirst)) { nextSlide(); return; }
-    }
-
-    function matchWords(transcript, target) {
-      const cleanTranscript = transcript.replace(/[.,!?;:\-]/g, '').trim();
-      const cleanTarget = target.replace(/[.,!?;:\-]/g, '').trim();
-      if (cleanTranscript.includes(cleanTarget)) return true;
-      const tWords = cleanTranscript.split(/\s+/);
-      const targetWords = cleanTarget.split(/\s+/);
-      let matches = 0;
-      for (let i = 0; i < targetWords.length; i++) {
-        for (let j = 0; j < tWords.length; j++) {
-          if (tWords[j].includes(targetWords[i]) || targetWords[i].includes(tWords[j])) {
-            matches++; break;
-          }
-        }
-      }
-      return matches >= 3;
-    }
-
-    function getLastNWords(text, n) {
-      const words = text.trim().split(/\s+/).filter(w => w.length > 0);
-      return words.slice(-n).join(' ');
-    }
-    function getFirstNWords(text, n) {
-      const words = text.trim().split(/\s+/).filter(w => w.length > 0);
-      return words.slice(0, n).join(' ');
-    }
-
-    function updateVoiceStatus(text) {
-      document.getElementById('voiceStatus').textContent = text;
-      document.getElementById('voiceDebug').textContent = text;
-    }
-
-    document.getElementById('fileInput').addEventListener('change', function(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = function(event) {
-        const text = event.target.result;
-        parseTextToSlides(text);
-        currentSlide = 0;
-        renderSlides();
-        updateProjection();
-        updateStats();
-        console.log('Arquivo carregado: ' + slides.length + ' slides');
-      };
-      reader.onerror = function() {
-        console.error('Erro ao ler arquivo');
-        updateVoiceStatus('Erro ao carregar arquivo');
-      };
-      // força UTF-8; ajuda com acentos
-      reader.readAsText(file, 'UTF-8');
-    });
-
-    function parseTextToSlides(text) {
-      // aceita: "1. ..." numeração OU blocos separados por linhas em branco
-      let sections = text.split(/\n\s*\d+\.\s+/);
-      if (sections.length > 1) {
-        sections.shift();
-        slides = sections.map((s, i) => `${i + 1}. ${s.trim()}`).filter(s => s.trim().length > 0);
-      } else {
-        slides = text.split(/\n\s*\n+/).map(s => s.trim()).filter(s => s.length > 0);
-      }
-    }
-
-    function renderSlides() {
-      const grid = document.getElementById('slidesGrid');
-      grid.innerHTML = '';
-      for (let i = 0; i < slides.length; i++) {
-        const thumbnail = document.createElement('div');
-        thumbnail.className = 'slide-thumbnail';
-        if (i === currentSlide) thumbnail.classList.add('active');
-
-        const inner = document.createElement('div');
-        inner.style.position = 'absolute';
-        inner.style.top = '50%';
-        inner.style.left = '50%';
-        inner.style.transform = 'translate(-50%, -50%)';
-        const preview = slides[i].substring(0, 40).replace(/\n/g, ' ');
-        inner.textContent = preview + (slides[i].length > 40 ? '...' : '');
-        thumbnail.appendChild(inner);
-
-        const numSpan = document.createElement('div');
-        numSpan.className = 'slide-number';
-        numSpan.textContent = (i + 1);
-        thumbnail.appendChild(numSpan);
-
-        thumbnail.addEventListener('click', () => {
-          currentSlide = i;
-          renderSlides();
-          updateProjection();
-          updateStats();
-        });
-
-        grid.appendChild(thumbnail);
-      }
-    }
-
-    function updateProjection() {
-      const screen = document.getElementById('projectionScreen');
-      if (slides.length === 0) {
-        screen.textContent = 'Carregue um arquivo TXT para começar';
-        document.getElementById('slideCounter').textContent = '0/0';
-        return;
-      }
-      screen.textContent = slides[currentSlide];
-      document.getElementById('slideCounter').textContent = (currentSlide + 1) + '/' + slides.length;
-
-      // atualiza telão se estiver aberto
-      if (telaoWindow && !telaoWindow.closed && typeof telaoWindow.updateContent === 'function') {
-        telaoWindow.updateContent(slides[currentSlide]);
-      }
-      adjustFontSize();
-    }
-
-    function adjustFontSize() {
-      const screen = document.getElementById('projectionScreen');
-      const maxWidth = 770;
-      const maxHeight = 570;
-      let fontSize = 90;
-      screen.style.fontSize = fontSize + 'px';
-      let attempts = 0;
-      while ((screen.scrollHeight > maxHeight || screen.scrollWidth > maxWidth) && fontSize > 20 && attempts < 100) {
-        fontSize = fontSize - 1;
-        screen.style.fontSize = fontSize + 'px';
-        attempts++;
-      }
-    }
-
-    function updateStats() {
-      document.getElementById('totalSlides').textContent = slides.length;
-      document.getElementById('currentSlideNum').textContent = (currentSlide + 1);
-      document.getElementById('voiceStatus2').textContent =
-        document.getElementById('voiceBtn').dataset.active === 'true' ? 'Ligada' : 'Desligada';
-    }
-
-    function nextSlide() {
-      if (currentSlide < slides.length - 1) {
-        currentSlide++;
-        renderSlides();
-        updateProjection();
-        updateStats();
-      }
-    }
-
-    function prevSlide() {
-      if (currentSlide > 0) {
-        currentSlide--;
-        renderSlides();
-        updateProjection();
-        updateStats();
-      }
-    }
-
-    function openTelaoWindow() {
-      // abrir via gesto do usuário evita bloqueio; ainda assim, verificar popup
-      try {
-        telaoWindow = window.open('about:blank', 'telao', 'width=800,height=600,menubar=no,toolbar=no,location=no,status=no');
-        if (!telaoWindow) {
-          updateVoiceStatus('Pop-up bloqueado. Permita abrir janelas para o telão.');
-          return;
-        }
-      } catch (e) {
-        updateVoiceStatus('Não foi possível abrir o telão');
-        return;
-      }
-
-      const telaoHTML = `
-        <!DOCTYPE html>
-        <html lang="pt-BR">
-          <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Telão - Voice Presentation</title>
-            <style>
-              *{margin:0;padding:0;box-sizing:border-box}
-              body{width:100%;height:100%;background:#000;display:flex;align-items:center;justify-content:center;font-family:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif}
-              #telaoContent{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:20px;font-size:90px;text-align:center;line-height:1.1;color:#fff;overflow:hidden;word-wrap:break-word;font-weight:500}
-            </style>
-          </head>
-          <body>
-            <div id="telaoContent">Carregue um arquivo TXT para começar</div>
-            <script>
-              function updateContent(text){
-                const el = document.getElementById("telaoContent");
-                el.textContent = text;
-                adjustFontSize();
-              }
-              function adjustFontSize(){
-                const content = document.getElementById("telaoContent");
-                const maxWidth = window.innerWidth - 40;
-                const maxHeight = window.innerHeight - 40;
-                let fontSize = 90;
-                content.style.fontSize = fontSize + "px";
-                let attempts = 0;
-                while((content.scrollHeight > maxHeight || content.scrollWidth > maxWidth) && fontSize > 20 && attempts < 100){
-                  fontSize = fontSize - 1;
-                  content.style.fontSize = fontSize + "px";
-                  attempts++;
-                }
-              }
-              window.updateContent = updateContent;
-              window.addEventListener('resize', adjustFontSize);
-              document.addEventListener('DOMContentLoaded', adjustFontSize);
-            </script>
-          </body>
-        </html>
-      `;
-
-      // escrever conteúdo e só então atualizar
-      const doc = telaoWindow.document;
-      doc.open();
-      doc.write(telaoHTML);
-      doc.close();
-
-      const tryUpdate = () => {
-        if (telaoWindow && !telaoWindow.closed && typeof telaoWindow.updateContent === 'function') {
-          telaoWindow.updateContent(slides.length > 0 ? slides[currentSlide] : 'Carregue um arquivo TXT para começar');
-        } else {
-          // tenta novamente em breve (carregamento pode demorar)
-          setTimeout(tryUpdate, 100);
-        }
-      };
-      tryUpdate();
-    }
-
-    document.getElementById('nextBtn').addEventListener('click', nextSlide);
-    document.getElementById('prevBtn').addEventListener('click', prevSlide);
-    document.getElementById('telaoBtn').addEventListener('click', openTelaoWindow);
-
-    document.getElementById('voiceBtn').addEventListener('click', function() {
-      const btn = this;
-      if (!recognition) {
-        updateVoiceStatus('Voz não suportada');
-        return;
-      }
-      if (btn.dataset.active === 'true') {
+    voiceBtn.onclick = () => {
+      if (!recognition) { initVoiceRecognition(); }
+      if (voiceBtn.dataset.active === "true") {
         recognition.stop();
-        btn.dataset.active = 'false';
-        btn.textContent = '🎤 Iniciar Voz';
-        updateVoiceStatus('Microfone desligado');
-      } else {
-        try {
-          recognition.start();
-          btn.dataset.active = 'true';
-          btn.textContent = '🎤 Parar Voz';
-          updateVoiceStatus('Escutando...');
-        } catch (e) {
-          updateVoiceStatus('Falha ao iniciar microfone');
-        }
-      }
-      updateStats();
-    });
-
-    document.addEventListener('keydown', function(e) {
-      if (slides.length === 0) return;
-      if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
-      if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
-    });
-
-    // inicialização
-    initVoiceRecognition();
-    renderSlides();
-    updateProjection();
-    updateStats();
-    console.log('Voice Presentation App iniciado');
-  </script>
-</body>
-</html>
