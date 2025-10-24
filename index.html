@@ -196,4 +196,11 @@
         voiceIndicator.textContent = "Microfone desligado";
       } else {
         recognition.start();
-        voiceBtn.dataset
+        voiceBtn.dataset.active = "true";
+        voiceBtn.textContent = "🎤 Parar Voz";
+        voiceIndicator.textContent = "Escutando...";
+      }
+    };
+  </script>
+</body>
+</html>
