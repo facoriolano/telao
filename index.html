@@ -69,21 +69,29 @@
     const voiceBtn = document.getElementById("voiceBtn");
     const voiceIndicator = document.getElementById("voiceIndicator");
 
+    // === Carregar TXT ===
     fileInput.addEventListener("change", function (event) {
       const file = event.target.files[0];
+      if (!file) return;
       const reader = new FileReader();
       reader.onload = function (e) {
-        const texto = e.target.result;
-        trechos = texto.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+        const textoLimpo = e.target.result.replace(/\r\n/g, "\n");
+        trechos = textoLimpo.split("\n").map(l => l.trim()).filter(l => l.length > 0);
         abrirPopUpBtn.disabled = false;
         currentGroupIndex = 0;
         atualizarTela();
       };
+      reader.onerror = () => alert("Erro ao ler arquivo TXT");
       reader.readAsText(file, "UTF-8");
     });
 
+    // === Abrir Telão ===
     abrirPopUpBtn.onclick = () => {
       popupWindow = window.open("", "Telão", "width=800,height=600");
+      if (!popupWindow) {
+        alert("Pop-up bloqueado. Permita abrir janelas para usar o Telão.");
+        return;
+      }
       const doc = popupWindow.document;
       doc.head.innerHTML = `
         <title>Telão</title>
@@ -139,7 +147,7 @@
     avancarBtn.onclick = avancar;
     voltarBtn.onclick = voltar;
 
-    // ===== Reconhecimento de voz adaptado =====
+    // === Reconhecimento de Voz ===
     function initVoiceRecognition() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRecognition) {
@@ -164,7 +172,6 @@
         transcript = transcript.toLowerCase().trim();
         voiceIndicator.textContent = "Ouvindo: " + transcript;
         if (event.results[event.results.length - 1].isFinal) {
-          // lógica simples: se falou "próximo" ou "avançar"
           if (transcript.includes("próximo") || transcript.includes("avançar")) avancar();
           if (transcript.includes("voltar") || transcript.includes("anterior")) voltar();
         }
@@ -181,6 +188,9 @@
     }
 
     voiceBtn.onclick = () => {
-      if (!recognition) { initVoiceRecognition(); }
+      if (!recognition) initVoiceRecognition();
       if (voiceBtn.dataset.active === "true") {
         recognition.stop();
+        voiceBtn.dataset.active = "false";
+        voiceBtn.textContent = "🎤 Iniciar Voz";
+        voiceIndicator.textContent =
