@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
@@ -174,8 +174,12 @@
         }
         transcript = transcript.toLowerCase().trim();
         voiceIndicator.textContent = "Ouvindo: " + transcript;
+        // Processar mesmo antes de ser final para resposta mais rápida
         if (event.results[event.results.length - 1].isFinal) {
           processVoiceCommand(transcript);
+        } else if (transcript.length > 3) {
+          // Verificar também em resultados intermediários para resposta mais rápida
+          processVoiceCommandFast(transcript);
         }
       };
 
@@ -186,9 +190,41 @@
       recognition.onend = () => {
         voiceIndicator.classList.remove("listening");
         if (voiceBtn.dataset.active === "true") {
-          setTimeout(() => recognition.start(), 200);
+          setTimeout(() => recognition.start(), 50);
         }
       };
+    }
+
+    // === Processar Comando de Voz (Rápido) ===
+    function processVoiceCommandFast(transcript) {
+      if (trechos.length === 0) return;
+      
+      const grupoAtual = getCurrentGroup();
+      const textoAtual = grupoAtual.join(' ').toLowerCase();
+      const ultimasPalavras = getLastNWords(textoAtual, 4);
+      
+      if (ultimasPalavras && matchWords(transcript, ultimasPalavras)) {
+        console.log('✓ Avançando RÁPIDO por últimas 4 palavras');
+        voiceIndicator.textContent = '✓ Avançando... (' + ultimasPalavras + ')';
+        recognition.stop();
+        avancar();
+        return;
+      }
+      
+      const totalGroups = Math.ceil(trechos.length / groupSize);
+      if (currentGroupIndex < totalGroups - 1) {
+        const proximoGrupo = trechos.slice((currentGroupIndex + 1) * groupSize, (currentGroupIndex + 1) * groupSize + groupSize);
+        const textoProximo = proximoGrupo.join(' ').toLowerCase();
+        const primeirasProximas = getFirstNWords(textoProximo, 4);
+        
+        if (primeirasProximas && matchWords(transcript, primeirasProximas)) {
+          console.log('✓ Avançando RÁPIDO por primeiras 4 do próximo');
+          voiceIndicator.textContent = '✓ Avançando... (' + primeirasProximas + ')';
+          recognition.stop();
+          avancar();
+          return;
+        }
+      }
     }
 
     // === Processar Comando de Voz ===
